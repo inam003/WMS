@@ -24,6 +24,37 @@ export interface CurrentWmsUser {
   isActive: boolean;
 }
 
+export interface AuditHistoryItem {
+  id: string;
+  actorSubject: string;
+  actionType: string;
+  entityType: string;
+  entityId: string;
+  createdAt: string;
+  referenceId: string | null;
+  correlationId: string | null;
+  beforeValues: string | null;
+  afterValues: string | null;
+}
+
+export interface AuditHistoryPage {
+  items: AuditHistoryItem[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+}
+
+export interface AuditHistoryFilters {
+  startDate?: string;
+  endDate?: string;
+  user?: string;
+  actionType?: string;
+  entityType?: string;
+  entityId?: string;
+  page?: number;
+  pageSize?: number;
+}
+
 export interface Product {
   id: string;
   sku: string;
@@ -494,6 +525,29 @@ export async function getCurrentWmsUser(): Promise<CurrentWmsUser> {
   const user = await authenticatedApiRequest<CurrentWmsUser>('/api/users/me');
   if (!user) throw new ApiError('The API returned no WMS access record.');
   return user;
+}
+
+export async function getAuditHistory(
+  filters: AuditHistoryFilters = {},
+  signal?: AbortSignal,
+): Promise<AuditHistoryPage> {
+  const query = new URLSearchParams();
+  if (filters.startDate) query.set('startDate', filters.startDate);
+  if (filters.endDate) query.set('endDate', filters.endDate);
+  if (filters.user) query.set('user', filters.user);
+  if (filters.actionType) query.set('actionType', filters.actionType);
+  if (filters.entityType) query.set('entityType', filters.entityType);
+  if (filters.entityId) query.set('entityId', filters.entityId);
+  query.set('page', String(filters.page ?? 1));
+  query.set('pageSize', String(filters.pageSize ?? 25));
+  const result = await authenticatedApiRequest<AuditHistoryPage>(
+    `/api/audit?${query.toString()}`,
+    { signal },
+  );
+  if (!result || !Array.isArray(result.items)) {
+    throw new ApiError('The API returned invalid audit history.');
+  }
+  return result;
 }
 
 export async function getWmsUsers(signal?: AbortSignal): Promise<WmsUser[]> {

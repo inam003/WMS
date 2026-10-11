@@ -17,6 +17,7 @@ import { Receiving } from './pages/receiving';
 import { Warehouses } from './pages/warehouses';
 import { WarehouseTransfers } from './pages/warehouse-transfers';
 import { Users } from './pages/users';
+import { AuditHistory } from './pages/audit-history';
 import { useWmsAccess } from './hooks/useWmsAccess';
 import type { WmsRole } from './lib/api';
 
@@ -70,6 +71,7 @@ export default function App() {
         <Route path="/orders" element={<Orders />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/users" element={<RequireRoles allowedRoles={adminRoles}><Users /></RequireRoles>} />
+        <Route path="/audit-history" element={<RequireRoles allowedRoles={adminRoles}><AuditHistory /></RequireRoles>} />
         <Route
           path="/inventory-transactions"
           element={<InventoryTransactions />}

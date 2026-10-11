@@ -22,6 +22,65 @@ namespace WMS.Infrastructure.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("WMS.Domain.AuditRecord", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("ActionType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("ActorSubject")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("AfterValues")
+                        .HasColumnType("jsonb");
+
+                    b.Property<string>("BeforeValues")
+                        .HasColumnType("jsonb");
+
+                    b.Property<Guid?>("CorrelationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("EntityId")
+                        .IsRequired()
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<string>("EntityType")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<Guid?>("ReferenceId")
+                        .HasColumnType("uuid");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("CorrelationId");
+
+                    b.HasIndex("CreatedAt")
+                        .HasDatabaseName("IX_AuditRecords_CreatedAt");
+
+                    b.HasIndex("ReferenceId");
+
+                    b.HasIndex("ActionType", "CreatedAt");
+
+                    b.HasIndex("ActorSubject", "CreatedAt");
+
+                    b.HasIndex("EntityType", "CreatedAt");
+
+                    b.ToTable("AuditRecords");
+                });
+
             modelBuilder.Entity("WMS.Domain.Category", b =>
                 {
                     b.Property<Guid>("Id")

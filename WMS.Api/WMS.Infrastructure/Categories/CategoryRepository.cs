@@ -33,7 +33,9 @@ public sealed class CategoryRepository(ApplicationDbContext dbContext) : ICatego
 
     public async Task UpdateAsync(Category category, CancellationToken cancellationToken)
     {
-        dbContext.Categories.Update(category);
+        var existing = await dbContext.Categories
+            .SingleAsync(candidate => candidate.Id == category.Id, cancellationToken);
+        dbContext.Entry(existing).CurrentValues.SetValues(category);
         await dbContext.SaveChangesAsync(cancellationToken);
     }
 

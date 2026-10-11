@@ -78,6 +78,11 @@ const navigation = [
   { label: 'Reports', to: '/reports', icon: <AssessmentOutlinedIcon /> },
   { label: 'Users', to: '/users', icon: <ManageAccountsOutlinedIcon /> },
   {
+    label: 'Audit History',
+    to: '/audit-history',
+    icon: <HistoryOutlinedIcon />,
+  },
+  {
     label: 'Transactions',
     to: '/inventory-transactions',
     icon: <HistoryOutlinedIcon />,
@@ -303,7 +308,9 @@ function SidebarContents({
 }) {
   const wmsUser = useWmsAccess();
   const visibleNavigation = navigation.filter((item) => {
-    if (item.to === '/users') return wmsUser.role === 'Admin';
+    if (item.to === '/users' || item.to === '/audit-history') {
+      return wmsUser.role === 'Admin';
+    }
     if (
       ['/receiving', '/inventory-adjustments', '/warehouse-transfers'].includes(
         item.to,

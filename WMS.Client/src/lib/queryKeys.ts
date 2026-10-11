@@ -37,6 +37,9 @@ export const queryKeys = {
     current: ['wms-user', 'current'] as const,
     all: ['wms-users'] as const,
   },
+  audit: {
+    page: (filters: object) => ['audit', 'page', filters] as const,
+  },
 };
 
 interface InventoryQueryFilters {

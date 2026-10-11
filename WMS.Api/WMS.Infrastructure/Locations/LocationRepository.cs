@@ -79,7 +79,9 @@ public sealed class LocationRepository(ApplicationDbContext dbContext) : ILocati
         Location location,
         CancellationToken cancellationToken)
     {
-        dbContext.Locations.Update(location);
+        var existing = await dbContext.Locations
+            .SingleAsync(candidate => candidate.Id == location.Id, cancellationToken);
+        dbContext.Entry(existing).CurrentValues.SetValues(location);
         return await SaveChangesAsync(cancellationToken);
     }
 

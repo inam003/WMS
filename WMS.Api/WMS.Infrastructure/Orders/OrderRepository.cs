@@ -53,23 +53,22 @@ public sealed class OrderRepository(ApplicationDbContext dbContext) : IOrderRepo
     {
         await using var transaction =
             await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        var rowsUpdated = await dbContext.Orders
-            .Where(order =>
-                order.Id == updatedOrder.Id &&
-                order.Status == CustomerOrderStatus.Draft)
-            .ExecuteUpdateAsync(
-                updates => updates
-                    .SetProperty(order => order.CustomerName, updatedOrder.CustomerName)
-                    .SetProperty(order => order.ReferenceId, updatedOrder.ReferenceId),
+        var order = await dbContext.Orders
+            .FromSqlInterpolated(
+                $"SELECT * FROM \"Orders\" WHERE \"Id\" = {updatedOrder.Id} FOR UPDATE")
+            .Include(item => item.Lines)
+            .SingleOrDefaultAsync(
+                item => item.Status == CustomerOrderStatus.Draft,
                 cancellationToken);
-        if (rowsUpdated != 1)
+        if (order is null)
         {
             return false;
         }
 
-        await dbContext.OrderLines
-            .Where(line => line.OrderId == updatedOrder.Id)
-            .ExecuteDeleteAsync(cancellationToken);
+        order.CustomerName = updatedOrder.CustomerName;
+        order.ReferenceId = updatedOrder.ReferenceId;
+        dbContext.OrderLines.RemoveRange(order.Lines);
+        order.Lines = updatedOrder.Lines;
         dbContext.OrderLines.AddRange(updatedOrder.Lines);
         await dbContext.SaveChangesAsync(cancellationToken);
         await transaction.CommitAsync(cancellationToken);
@@ -82,12 +81,23 @@ public sealed class OrderRepository(ApplicationDbContext dbContext) : IOrderRepo
         CustomerOrderStatus nextStatus,
         CancellationToken cancellationToken)
     {
-        var rowsUpdated = await dbContext.Orders
-            .Where(order => order.Id == orderId && order.Status == currentStatus)
-            .ExecuteUpdateAsync(
-                updates => updates.SetProperty(order => order.Status, nextStatus),
+        await using var transaction =
+            await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var order = await dbContext.Orders
+            .FromSqlInterpolated(
+                $"SELECT * FROM \"Orders\" WHERE \"Id\" = {orderId} FOR UPDATE")
+            .SingleOrDefaultAsync(
+                candidate => candidate.Status == currentStatus,
                 cancellationToken);
-        return rowsUpdated == 1;
+        if (order is null)
+        {
+            return false;
+        }
+
+        order.Status = nextStatus;
+        await dbContext.SaveChangesAsync(cancellationToken);
+        await transaction.CommitAsync(cancellationToken);
+        return true;
     }
 
     private static System.Linq.Expressions.Expression<Func<CustomerOrder, OrderResponse>>

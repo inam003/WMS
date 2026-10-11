@@ -50,7 +50,9 @@ public sealed class WarehouseRepository(ApplicationDbContext dbContext) : IWareh
         Warehouse warehouse,
         CancellationToken cancellationToken)
     {
-        dbContext.Warehouses.Update(warehouse);
+        var existing = await dbContext.Warehouses
+            .SingleAsync(candidate => candidate.Id == warehouse.Id, cancellationToken);
+        dbContext.Entry(existing).CurrentValues.SetValues(warehouse);
         return await SaveChangesAsync(cancellationToken);
     }
 

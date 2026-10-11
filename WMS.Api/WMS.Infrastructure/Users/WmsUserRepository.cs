@@ -1,12 +1,16 @@
 using System.Data;
+using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
+using WMS.Application.Audit;
 using WMS.Application.Users;
 using WMS.Domain;
 using WMS.Infrastructure.Data;
 
 namespace WMS.Infrastructure.Users;
 
-public sealed class WmsUserRepository(ApplicationDbContext dbContext) : IWmsUserRepository
+public sealed class WmsUserRepository(
+    ApplicationDbContext dbContext,
+    ICurrentAuditActor currentAuditActor) : IWmsUserRepository
 {
     public async Task<WmsUserAssignment> GetOrCreateAsync(
         string subject,
@@ -20,13 +24,41 @@ public sealed class WmsUserRepository(ApplicationDbContext dbContext) : IWmsUser
             return existingUser;
         }
 
-        await dbContext.Database.ExecuteSqlInterpolatedAsync(
+        await using var transaction =
+            await dbContext.Database.BeginTransactionAsync(cancellationToken);
+        var inserted = await dbContext.Database.ExecuteSqlInterpolatedAsync(
             $"""
             INSERT INTO "WmsUserAssignments" ("Subject", "Role", "IsActive", "CreatedAt", "UpdatedAt")
             VALUES ({subject}, {"Viewer"}, TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
             ON CONFLICT ("Subject") DO NOTHING
             """,
             cancellationToken);
+        if (inserted == 1)
+        {
+            var actor = currentAuditActor.Subject;
+            if (string.IsNullOrWhiteSpace(actor))
+            {
+                throw new InvalidOperationException(
+                    "Audited WMS changes require the authenticated subject claim.");
+            }
+
+            dbContext.AuditRecords.Add(new AuditRecord
+            {
+                Id = Guid.NewGuid(),
+                ActorSubject = actor,
+                ActionType = "User.AccessCreated",
+                EntityType = "User",
+                EntityId = subject,
+                CreatedAt = DateTimeOffset.UtcNow,
+                AfterValues = JsonSerializer.Serialize(new
+                {
+                    Role = WmsRole.Viewer.ToString(),
+                    IsActive = true
+                })
+            });
+            await dbContext.SaveChangesAsync(cancellationToken);
+        }
+        await transaction.CommitAsync(cancellationToken);
 
         return await dbContext.WmsUserAssignments
             .AsNoTracking()

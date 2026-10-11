@@ -70,7 +70,9 @@ public sealed class ProductRepository(ApplicationDbContext dbContext) : IProduct
         Product product,
         CancellationToken cancellationToken)
     {
-        dbContext.Products.Update(product);
+        var existing = await dbContext.Products
+            .SingleAsync(candidate => candidate.Id == product.Id, cancellationToken);
+        dbContext.Entry(existing).CurrentValues.SetValues(product);
         return await SaveChangesAsync(cancellationToken);
     }
 

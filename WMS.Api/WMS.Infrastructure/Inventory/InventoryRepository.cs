@@ -1,3 +1,4 @@
+﻿using System.Text.Json;
 using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using WMS.Application.Inventory;
@@ -276,6 +277,40 @@ public sealed class InventoryRepository(ApplicationDbContext dbContext) : IInven
             return new InventoryMovementPersistenceResult(
                 InventoryMovementPersistenceStatus.QuantityLimitExceeded,
                 null);
+        }
+
+        if (orderDispatch is not null)
+        {
+            var dispatchedAt = DateTimeOffset.UtcNow;
+            dbContext.AuditRecords.Add(new WMS.Domain.AuditRecord
+            {
+                Id = Guid.NewGuid(),
+                ActorSubject = transactions[0].CreatedBy,
+                ActionType = "Order.Dispatched",
+                EntityType = "Order",
+                EntityId = orderDispatch.OrderId.ToString(),
+                CreatedAt = dispatchedAt,
+                ReferenceId = orderDispatch.ReferenceId,
+                CorrelationId = transactions[0].IdempotencyKey,
+                BeforeValues = JsonSerializer.Serialize(new
+                {
+                    Status = WMS.Domain.CustomerOrderStatus.Ready.ToString()
+                }),
+                AfterValues = JsonSerializer.Serialize(new
+                {
+                    Status = WMS.Domain.CustomerOrderStatus.Dispatched.ToString(),
+                    DispatchedBy = transactions[0].CreatedBy,
+                    DispatchedAt = dispatchedAt,
+                    Lines = orderDispatch.Lines.Select(line => new
+                    {
+                        line.OrderLineId,
+                        line.ProductId,
+                        line.LocationId,
+                        line.Quantity
+                    })
+                })
+            });
+            await dbContext.SaveChangesAsync(cancellationToken);
         }
 
         await databaseTransaction.CommitAsync(cancellationToken);
