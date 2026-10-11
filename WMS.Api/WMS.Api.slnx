@@ -1,7 +1,4 @@
 <Solution>
-  <Folder Name="/Solution Items/">
-    <File Path=".gitignore.txt" />
-  </Folder>
   <Project Path="WMS.Api/WMS.Api.csproj" />
   <Project Path="WMS.Application/WMS.Application.csproj" />
   <Project Path="WMS.Client/WMS.Client.csproj" />
