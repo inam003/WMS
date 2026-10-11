@@ -11,6 +11,7 @@ import { Locations } from './pages/locations';
 import { Products } from './pages/products';
 import { Receiving } from './pages/receiving';
 import { Warehouses } from './pages/warehouses';
+import { WarehouseTransfers } from './pages/warehouse-transfers';
 
 export default function App() {
   return (
@@ -26,6 +27,7 @@ export default function App() {
         <Route path="/inventory" element={<Inventory />} />
         <Route path="/inventory-adjustments" element={<InventoryAdjustments />} />
         <Route path="/receiving" element={<Receiving />} />
+        <Route path="/warehouse-transfers" element={<WarehouseTransfers />} />
         <Route
           path="/inventory-transactions"
           element={<InventoryTransactions />}

@@ -111,6 +111,9 @@ namespace WMS.Infrastructure.Migrations
                     b.Property<Guid?>("ReferenceId")
                         .HasColumnType("uuid");
 
+                    b.Property<Guid?>("TransferId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Type")
                         .IsRequired()
                         .HasMaxLength(50)

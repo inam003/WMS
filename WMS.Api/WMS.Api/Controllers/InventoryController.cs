@@ -103,6 +103,36 @@ public sealed class InventoryController(IInventoryService inventoryService) : Co
             result.Value.Transaction);
     }
 
+    [HttpPost("transfers")]
+    [ProducesResponseType(
+        typeof(IReadOnlyList<InventoryTransactionResponse>),
+        StatusCodes.Status201Created)]
+    [ProducesResponseType(
+        typeof(IReadOnlyList<InventoryTransactionResponse>),
+        StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<IReadOnlyList<InventoryTransactionResponse>>> Transfer(
+        CreateInventoryTransferRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        var result = await inventoryService.TransferAsync(
+            request,
+            idempotencyKey,
+            User.FindFirst("sub")?.Value,
+            cancellationToken);
+        if (!result.Succeeded)
+        {
+            return ToErrorResponse(result.Error, result.ValidationErrors);
+        }
+
+        return result.Value!.IsReplay
+            ? Ok(result.Value.Transactions)
+            : StatusCode(StatusCodes.Status201Created, result.Value.Transactions);
+    }
+
     private ActionResult ToErrorResponse(
         InventoryError error,
         IReadOnlyDictionary<string, string[]>? validationErrors) =>
@@ -144,7 +174,7 @@ public sealed class InventoryController(IInventoryService inventoryService) : Co
             InventoryError.IdempotencyConflict => Conflict(new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,
-                Title = "The idempotency key was already used for a different receipt."
+                Title = "The idempotency key was already used for a different inventory movement."
             }),
             InventoryError.QuantityLimitExceeded => Conflict(new ProblemDetails
             {
@@ -154,7 +184,7 @@ public sealed class InventoryController(IInventoryService inventoryService) : Co
             InventoryError.InsufficientInventory => Conflict(new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,
-                Title = "The adjustment would reduce inventory below zero."
+                Title = "The inventory movement would reduce stock below zero."
             }),
             InventoryError.NotFound => NotFound(),
             InventoryError.None => throw new InvalidOperationException(

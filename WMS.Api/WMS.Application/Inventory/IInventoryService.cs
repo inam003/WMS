@@ -18,4 +18,9 @@ public interface IInventoryService
         string? idempotencyKey,
         string? createdBy,
         CancellationToken cancellationToken);
+    Task<InventoryOperationResult<InventoryMovementResult>> TransferAsync(
+        CreateInventoryTransferRequest request,
+        string? idempotencyKey,
+        string? createdBy,
+        CancellationToken cancellationToken);
 }

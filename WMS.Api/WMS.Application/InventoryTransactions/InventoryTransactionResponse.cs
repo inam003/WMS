@@ -20,4 +20,5 @@ public sealed record InventoryTransactionResponse(
     DateTimeOffset CreatedAt,
     [property: JsonConverter(typeof(JsonStringEnumConverter<InventoryAdjustmentReason>))]
     InventoryAdjustmentReason? AdjustmentReason,
-    string? AdjustmentExplanation);
+    string? AdjustmentExplanation,
+    Guid? TransferId);

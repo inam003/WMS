@@ -13,4 +13,4 @@ public enum InventoryMovementPersistenceStatus
 
 public sealed record InventoryMovementPersistenceResult(
     InventoryMovementPersistenceStatus Status,
-    InventoryTransactionResponse? Transaction);
+    IReadOnlyList<InventoryTransactionResponse>? Transactions);

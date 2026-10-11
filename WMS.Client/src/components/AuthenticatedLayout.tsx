@@ -30,6 +30,7 @@ import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
 import StorageOutlinedIcon from '@mui/icons-material/StorageOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import MoveToInboxOutlinedIcon from '@mui/icons-material/MoveToInboxOutlined';
+import SwapHorizOutlinedIcon from '@mui/icons-material/SwapHorizOutlined';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import {
@@ -57,6 +58,11 @@ const navigation = [
     icon: <TuneOutlinedIcon />,
   },
   { label: 'Receiving', to: '/receiving', icon: <MoveToInboxOutlinedIcon /> },
+  {
+    label: 'Transfers',
+    to: '/warehouse-transfers',
+    icon: <SwapHorizOutlinedIcon />,
+  },
   {
     label: 'Transactions',
     to: '/inventory-transactions',

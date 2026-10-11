@@ -1,3 +1,4 @@
+using WMS.Application.InventoryTransactions;
 using WMS.Domain;
 
 namespace WMS.Application.Inventory;
@@ -73,15 +74,15 @@ public sealed class InventoryService(IInventoryRepository repository) : IInvento
         CancellationToken cancellationToken) =>
         await ApplyMovementAsync(
             request.ProductId,
-            request.LocationId,
             request.Quantity,
-            ReceiptTransactionType,
+            [(request.LocationId, ReceiptTransactionType)],
+            [new InventoryQuantityChange(request.ProductId, request.LocationId, request.Quantity)],
             request.ReferenceId,
             null,
             null,
-            1,
             idempotencyKey,
             createdBy,
+            null,
             cancellationToken);
 
     public async Task<InventoryOperationResult<InventoryMovementResult>> AdjustAsync(
@@ -124,29 +125,77 @@ public sealed class InventoryService(IInventoryRepository repository) : IInvento
         var isIncrease = request.Type == InventoryAdjustmentType.Increase;
         return await ApplyMovementAsync(
             request.ProductId,
-            request.LocationId,
             request.Quantity,
-            isIncrease ? "AdjustmentIncrease" : "AdjustmentDecrease",
+            [(request.LocationId, isIncrease ? "AdjustmentIncrease" : "AdjustmentDecrease")],
+            [
+                new InventoryQuantityChange(
+                    request.ProductId,
+                    request.LocationId,
+                    request.Quantity * (isIncrease ? 1 : -1))
+            ],
             null,
             request.Reason,
             explanation,
-            isIncrease ? 1 : -1,
             idempotencyKey,
             createdBy,
+            null,
+            cancellationToken);
+    }
+
+    public async Task<InventoryOperationResult<InventoryMovementResult>> TransferAsync(
+        CreateInventoryTransferRequest request,
+        string? idempotencyKey,
+        string? createdBy,
+        CancellationToken cancellationToken)
+    {
+        if (request.SourceLocationId == request.DestinationLocationId)
+        {
+            return InventoryOperationResult<InventoryMovementResult>.InvalidRequest(
+                new Dictionary<string, string[]>
+                {
+                    [nameof(request.DestinationLocationId)] =
+                        ["Source and destination locations must be different."]
+                });
+        }
+
+        var transferId = Guid.NewGuid();
+        return await ApplyMovementAsync(
+            request.ProductId,
+            request.Quantity,
+            [
+                (request.SourceLocationId, "TransferOut"),
+                (request.DestinationLocationId, "TransferIn")
+            ],
+            [
+                new InventoryQuantityChange(
+                    request.ProductId,
+                    request.SourceLocationId,
+                    -request.Quantity),
+                new InventoryQuantityChange(
+                    request.ProductId,
+                    request.DestinationLocationId,
+                    request.Quantity)
+            ],
+            request.ReferenceId,
+            null,
+            null,
+            idempotencyKey,
+            createdBy,
+            transferId,
             cancellationToken);
     }
 
     private async Task<InventoryOperationResult<InventoryMovementResult>> ApplyMovementAsync(
         Guid productId,
-        Guid locationId,
         decimal quantity,
-        string transactionType,
+        IReadOnlyList<(Guid LocationId, string Type)> movements,
+        IReadOnlyList<InventoryQuantityChange> quantityChanges,
         Guid? referenceId,
         InventoryAdjustmentReason? adjustmentReason,
         string? adjustmentExplanation,
-        int direction,
         string? idempotencyKey,
         string? createdBy,
+        Guid? transferId,
         CancellationToken cancellationToken)
     {
         var validationErrors = new Dictionary<string, string[]>();
@@ -155,9 +204,13 @@ public sealed class InventoryService(IInventoryRepository repository) : IInvento
             validationErrors["ProductId"] = ["ProductId must not be empty."];
         }
 
-        if (locationId == Guid.Empty)
+        for (var index = 0; index < movements.Count; index++)
         {
-            validationErrors["LocationId"] = ["LocationId must not be empty."];
+            if (movements[index].LocationId == Guid.Empty)
+            {
+                validationErrors[index == 0 ? "SourceLocationId" : "DestinationLocationId"] =
+                    ["Location ID must not be empty."];
+            }
         }
 
         if (quantity <= 0 ||
@@ -184,28 +237,36 @@ public sealed class InventoryService(IInventoryRepository repository) : IInvento
             return InventoryOperationResult<InventoryMovementResult>.InvalidRequest(validationErrors);
         }
 
-        var existingTransaction = await repository.GetTransactionByIdempotencyKeyAsync(
+        var transactions = movements.Select((movement, index) =>
+            new WMS.Domain.InventoryTransaction
+            {
+                Id = Guid.NewGuid(),
+                ProductId = productId,
+                LocationId = movement.LocationId,
+                Quantity = quantity,
+                Type = movement.Type,
+                ReferenceId = referenceId,
+                IdempotencyKey = index == 0 ? parsedIdempotencyKey : null,
+                TransferId = transferId,
+                AdjustmentReason = adjustmentReason,
+                AdjustmentExplanation = adjustmentExplanation,
+                CreatedBy = createdBy!
+            }).ToArray();
+
+        var existingTransactions = await repository.GetTransactionsByIdempotencyKeyAsync(
             createdBy!,
             parsedIdempotencyKey,
             cancellationToken);
-        if (existingTransaction is not null)
+        if (existingTransactions.Count > 0)
         {
-            var isReplay =
-                existingTransaction.Type == transactionType &&
-                existingTransaction.ProductId == productId &&
-                existingTransaction.LocationId == locationId &&
-                existingTransaction.Quantity == quantity &&
-                existingTransaction.ReferenceId == referenceId &&
-                existingTransaction.AdjustmentReason == adjustmentReason &&
-                existingTransaction.AdjustmentExplanation == adjustmentExplanation;
-            if (!isReplay)
+            if (!AreSameMovement(transactions, existingTransactions))
             {
                 return InventoryOperationResult<InventoryMovementResult>.Failure(
                     InventoryError.IdempotencyConflict);
             }
 
             return InventoryOperationResult<InventoryMovementResult>.Success(
-                new InventoryMovementResult(existingTransaction, true));
+                new InventoryMovementResult(existingTransactions, true));
         }
 
         var productIsActive = await repository.GetProductActiveAsync(
@@ -223,36 +284,27 @@ public sealed class InventoryService(IInventoryRepository repository) : IInvento
                 InventoryError.InactiveProduct);
         }
 
-        var locationIsActive = await repository.GetLocationActiveAsync(
-            locationId,
-            cancellationToken);
-        if (!locationIsActive.HasValue)
+        foreach (var locationId in movements.Select(movement => movement.LocationId).Distinct())
         {
-            return InventoryOperationResult<InventoryMovementResult>.Failure(
-                InventoryError.LocationNotFound);
-        }
+            var locationIsActive = await repository.GetLocationActiveAsync(
+                locationId,
+                cancellationToken);
+            if (!locationIsActive.HasValue)
+            {
+                return InventoryOperationResult<InventoryMovementResult>.Failure(
+                    InventoryError.LocationNotFound);
+            }
 
-        if (!locationIsActive.Value)
-        {
-            return InventoryOperationResult<InventoryMovementResult>.Failure(
-                InventoryError.InactiveLocation);
+            if (!locationIsActive.Value)
+            {
+                return InventoryOperationResult<InventoryMovementResult>.Failure(
+                    InventoryError.InactiveLocation);
+            }
         }
 
         var persistenceResult = await repository.ApplyInventoryMovementAsync(
-            new WMS.Domain.InventoryTransaction
-            {
-                Id = Guid.NewGuid(),
-                ProductId = productId,
-                LocationId = locationId,
-                Quantity = quantity,
-                Type = transactionType,
-                ReferenceId = referenceId,
-                IdempotencyKey = parsedIdempotencyKey,
-                AdjustmentReason = adjustmentReason,
-                AdjustmentExplanation = adjustmentExplanation,
-                CreatedBy = createdBy!
-            },
-            quantity * direction,
+            transactions,
+            quantityChanges,
             cancellationToken);
 
         if (persistenceResult.Status == InventoryMovementPersistenceStatus.IdempotencyConflict)
@@ -273,14 +325,27 @@ public sealed class InventoryService(IInventoryRepository repository) : IInvento
                 InventoryError.InsufficientInventory);
         }
 
-        var savedTransaction = persistenceResult.Transaction
+        var savedTransactions = persistenceResult.Transactions
             ?? throw new InvalidOperationException(
-                "A successful inventory movement must include its transaction.");
+                "A successful inventory movement must include transaction history.");
         return InventoryOperationResult<InventoryMovementResult>.Success(
             new InventoryMovementResult(
-                savedTransaction,
+                savedTransactions,
                 persistenceResult.Status == InventoryMovementPersistenceStatus.Replayed));
     }
+
+    private static bool AreSameMovement(
+        IReadOnlyList<WMS.Domain.InventoryTransaction> expected,
+        IReadOnlyList<InventoryTransactionResponse> actual) =>
+        expected.Count == actual.Count &&
+        expected.All(candidate => actual.Any(existing =>
+            existing.Type == candidate.Type &&
+            existing.ProductId == candidate.ProductId &&
+            existing.LocationId == candidate.LocationId &&
+            existing.Quantity == candidate.Quantity &&
+            existing.ReferenceId == candidate.ReferenceId &&
+            existing.AdjustmentReason == candidate.AdjustmentReason &&
+            existing.AdjustmentExplanation == candidate.AdjustmentExplanation));
 
     private static Dictionary<string, string[]> ValidateQuery(InventoryQuery query)
     {

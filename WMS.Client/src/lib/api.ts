@@ -100,6 +100,7 @@ export interface InventoryTransaction {
   createdAt: string;
   adjustmentReason: string | null;
   adjustmentExplanation: string | null;
+  transferId: string | null;
 }
 
 export interface InventoryTransactionFilters {
@@ -138,6 +139,14 @@ export interface InventoryAdjustmentRequest {
   quantity: number;
   reason: InventoryAdjustmentReason;
   explanation: string | null;
+}
+
+export interface InventoryTransferRequest {
+  productId: string;
+  sourceLocationId: string;
+  destinationLocationId: string;
+  quantity: number;
+  referenceId: string | null;
 }
 
 interface ProblemDetails {
@@ -500,6 +509,20 @@ export async function adjustInventory(
   idempotencyKey: string,
 ): Promise<InventoryTransaction | null> {
   return authenticatedApiRequest<InventoryTransaction>('/api/inventory/adjustments', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify(request),
+  });
+}
+
+export async function transferInventory(
+  request: InventoryTransferRequest,
+  idempotencyKey: string,
+): Promise<InventoryTransaction[] | null> {
+  return authenticatedApiRequest<InventoryTransaction[]>('/api/inventory/transfers', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

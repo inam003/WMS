@@ -29,11 +29,32 @@ public sealed class InventoryRepository(ApplicationDbContext dbContext) : IInven
             .Select(location => (bool?)(location.IsActive && location.Warehouse.IsActive))
             .SingleOrDefaultAsync(cancellationToken);
 
-    public Task<InventoryTransactionResponse?> GetTransactionByIdempotencyKeyAsync(
+    public async Task<IReadOnlyList<InventoryTransactionResponse>> GetTransactionsByIdempotencyKeyAsync(
         string createdBy,
         Guid idempotencyKey,
-        CancellationToken cancellationToken) =>
-        FindByIdempotencyKeyAsync(createdBy, idempotencyKey, cancellationToken);
+        CancellationToken cancellationToken)
+    {
+        var original = await FindByIdempotencyKeyAsync(
+            createdBy,
+            idempotencyKey,
+            cancellationToken);
+        if (original is null)
+        {
+            return [];
+        }
+
+        if (!original.TransferId.HasValue)
+        {
+            return [original];
+        }
+
+        return await dbContext.InventoryTransactions
+            .AsNoTracking()
+            .Where(transaction => transaction.TransferId == original.TransferId)
+            .OrderBy(transaction => transaction.Type)
+            .Select(ToTransactionResponse)
+            .ToListAsync(cancellationToken);
+    }
 
     public async Task<IReadOnlyList<InventoryResponse>> GetAllAsync(
         InventoryQuery query,
@@ -77,13 +98,13 @@ public sealed class InventoryRepository(ApplicationDbContext dbContext) : IInven
             .SingleOrDefaultAsync(cancellationToken);
 
     public async Task<InventoryMovementPersistenceResult> ApplyInventoryMovementAsync(
-        WMS.Domain.InventoryTransaction transaction,
-        decimal quantityDelta,
+        IReadOnlyList<WMS.Domain.InventoryTransaction> transactions,
+        IReadOnlyList<InventoryQuantityChange> quantityChanges,
         CancellationToken cancellationToken)
     {
         await using var databaseTransaction =
             await dbContext.Database.BeginTransactionAsync(cancellationToken);
-        dbContext.InventoryTransactions.Add(transaction);
+        dbContext.InventoryTransactions.AddRange(transactions);
 
         try
         {
@@ -93,63 +114,75 @@ public sealed class InventoryRepository(ApplicationDbContext dbContext) : IInven
         {
             await databaseTransaction.RollbackAsync(cancellationToken);
             await databaseTransaction.DisposeAsync();
-            dbContext.Entry(transaction).State = EntityState.Detached;
+            foreach (var transaction in transactions)
+            {
+                dbContext.Entry(transaction).State = EntityState.Detached;
+            }
 
             var existing = await FindByIdempotencyKeyAsync(
-                transaction.CreatedBy,
-                transaction.IdempotencyKey!.Value,
+                transactions[0].CreatedBy,
+                transactions[0].IdempotencyKey!.Value,
                 cancellationToken);
             if (existing is null)
             {
                 throw new InvalidOperationException(
-                    "An idempotency key collision occurred, but the original receipt could not be loaded.",
+                    "An idempotency key collision occurred, but the original movement could not be loaded.",
                     exception);
             }
 
-            var isReplay =
-                existing.Type == transaction.Type &&
-                existing.ProductId == transaction.ProductId &&
-                existing.LocationId == transaction.LocationId &&
-                existing.Quantity == transaction.Quantity &&
-                existing.ReferenceId == transaction.ReferenceId &&
-                existing.AdjustmentReason == transaction.AdjustmentReason &&
-                existing.AdjustmentExplanation == transaction.AdjustmentExplanation;
+            var existingTransactions = existing.TransferId.HasValue
+                ? await dbContext.InventoryTransactions
+                    .AsNoTracking()
+                    .Where(transaction => transaction.TransferId == existing.TransferId)
+                    .OrderBy(transaction => transaction.Type)
+                    .Select(ToTransactionResponse)
+                    .ToListAsync(cancellationToken)
+                : [existing];
+            var isReplay = AreSameMovement(transactions, existingTransactions);
 
             return new InventoryMovementPersistenceResult(
                 isReplay
                     ? InventoryMovementPersistenceStatus.Replayed
                     : InventoryMovementPersistenceStatus.IdempotencyConflict,
-                existing);
+                existingTransactions);
         }
 
         try
         {
-            if (quantityDelta > 0)
+            foreach (var change in quantityChanges
+                .OrderBy(change => change.ProductId)
+                .ThenBy(change => change.LocationId))
             {
-                await dbContext.Database.ExecuteSqlInterpolatedAsync(
-                    $"""
-                    INSERT INTO "Inventory" ("Id", "ProductId", "LocationId", "Quantity")
-                    VALUES ({Guid.NewGuid()}, {transaction.ProductId}, {transaction.LocationId}, {quantityDelta})
-                    ON CONFLICT ("ProductId", "LocationId")
-                    DO UPDATE SET "Quantity" = "Inventory"."Quantity" + EXCLUDED."Quantity"
-                    """,
-                    cancellationToken);
-            }
-            else
-            {
+                if (change.QuantityDelta > 0)
+                {
+                    await dbContext.Database.ExecuteSqlInterpolatedAsync(
+                        $"""
+                        INSERT INTO "Inventory" ("Id", "ProductId", "LocationId", "Quantity")
+                        VALUES ({Guid.NewGuid()}, {change.ProductId}, {change.LocationId}, {change.QuantityDelta})
+                        ON CONFLICT ("ProductId", "LocationId")
+                        DO UPDATE SET "Quantity" = "Inventory"."Quantity" + EXCLUDED."Quantity"
+                        """,
+                        cancellationToken);
+                    continue;
+                }
+
                 var rowsUpdated = await dbContext.Database.ExecuteSqlInterpolatedAsync(
                     $"""
                     UPDATE "Inventory"
-                    SET "Quantity" = "Quantity" + {quantityDelta}
-                    WHERE "ProductId" = {transaction.ProductId}
-                      AND "LocationId" = {transaction.LocationId}
-                      AND "Quantity" >= {-quantityDelta}
+                    SET "Quantity" = "Quantity" + {change.QuantityDelta}
+                    WHERE "ProductId" = {change.ProductId}
+                      AND "LocationId" = {change.LocationId}
+                      AND "Quantity" >= {-change.QuantityDelta}
                     """,
                     cancellationToken);
                 if (rowsUpdated == 0)
                 {
                     await databaseTransaction.RollbackAsync(cancellationToken);
-                    dbContext.Entry(transaction).State = EntityState.Detached;
+                    foreach (var transaction in transactions)
+                    {
+                        dbContext.Entry(transaction).State = EntityState.Detached;
+                    }
+
                     return new InventoryMovementPersistenceResult(
                         InventoryMovementPersistenceStatus.InsufficientInventory,
                         null);
@@ -160,7 +193,10 @@ public sealed class InventoryRepository(ApplicationDbContext dbContext) : IInven
             exception.SqlState == PostgresErrorCodes.NumericValueOutOfRange)
         {
             await databaseTransaction.RollbackAsync(cancellationToken);
-            dbContext.Entry(transaction).State = EntityState.Detached;
+            foreach (var transaction in transactions)
+            {
+                dbContext.Entry(transaction).State = EntityState.Detached;
+            }
             return new InventoryMovementPersistenceResult(
                 InventoryMovementPersistenceStatus.QuantityLimitExceeded,
                 null);
@@ -169,18 +205,23 @@ public sealed class InventoryRepository(ApplicationDbContext dbContext) : IInven
         await databaseTransaction.CommitAsync(cancellationToken);
         await databaseTransaction.DisposeAsync();
 
-        var created = await GetTransactionResponseByIdAsync(
-            transaction.Id,
-            cancellationToken);
-        if (created is null)
+        var transactionIds = transactions.Select(transaction => transaction.Id).ToArray();
+        var created = await dbContext.InventoryTransactions
+            .AsNoTracking()
+            .Where(transaction => transactionIds.Contains(transaction.Id))
+            .Select(ToTransactionResponse)
+            .ToListAsync(cancellationToken);
+        if (created.Count != transactions.Count)
         {
             throw new InvalidOperationException(
-                "The receipt was committed, but its transaction record could not be loaded.");
+                "The inventory movement was committed, but its transaction records could not be loaded.");
         }
 
         return new InventoryMovementPersistenceResult(
             InventoryMovementPersistenceStatus.Created,
-            created);
+            transactions
+                .Select(transaction => created.Single(response => response.Id == transaction.Id))
+                .ToArray());
     }
 
     private Task<InventoryTransactionResponse?> FindByIdempotencyKeyAsync(
@@ -195,14 +236,18 @@ public sealed class InventoryRepository(ApplicationDbContext dbContext) : IInven
             .Select(ToTransactionResponse)
             .SingleOrDefaultAsync(cancellationToken);
 
-    private Task<InventoryTransactionResponse?> GetTransactionResponseByIdAsync(
-        Guid id,
-        CancellationToken cancellationToken) =>
-        dbContext.InventoryTransactions
-            .AsNoTracking()
-            .Where(transaction => transaction.Id == id)
-            .Select(ToTransactionResponse)
-            .SingleOrDefaultAsync(cancellationToken);
+    private static bool AreSameMovement(
+        IReadOnlyList<WMS.Domain.InventoryTransaction> expected,
+        IReadOnlyList<InventoryTransactionResponse> existing) =>
+        expected.Count == existing.Count &&
+        expected.All(candidate => existing.Any(transaction =>
+            transaction.Type == candidate.Type &&
+            transaction.ProductId == candidate.ProductId &&
+            transaction.LocationId == candidate.LocationId &&
+            transaction.Quantity == candidate.Quantity &&
+            transaction.ReferenceId == candidate.ReferenceId &&
+            transaction.AdjustmentReason == candidate.AdjustmentReason &&
+            transaction.AdjustmentExplanation == candidate.AdjustmentExplanation));
 
     private static bool IsIdempotencyKeyViolation(DbUpdateException exception) =>
         exception.GetBaseException() is PostgresException
@@ -244,5 +289,6 @@ public sealed class InventoryRepository(ApplicationDbContext dbContext) : IInven
             transaction.CreatedBy,
             transaction.CreatedAt,
             transaction.AdjustmentReason,
-            transaction.AdjustmentExplanation);
+            transaction.AdjustmentExplanation,
+            transaction.TransferId);
 }

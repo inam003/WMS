@@ -81,6 +81,8 @@ function formatDate(value: string): string {
 function formatTransactionType(type: string): string {
   if (type === 'AdjustmentIncrease') return 'Adjustment - Increase';
   if (type === 'AdjustmentDecrease') return 'Adjustment - Decrease';
+  if (type === 'TransferOut') return 'Transfer - Out';
+  if (type === 'TransferIn') return 'Transfer - In';
   return type;
 }
 
@@ -406,6 +408,7 @@ export function InventoryTransactions() {
                           <TableCell>Product</TableCell>
                           <TableCell>SKU</TableCell>
                           <TableCell>Type</TableCell>
+                          <TableCell>Transfer ID</TableCell>
                           <TableCell>Adjustment reason</TableCell>
                           <TableCell align="right">Quantity</TableCell>
                           <TableCell>Warehouse</TableCell>
@@ -423,6 +426,7 @@ export function InventoryTransactions() {
                             <TableCell>{transaction.productName}</TableCell>
                             <TableCell>{transaction.sku}</TableCell>
                             <TableCell>{formatTransactionType(transaction.type)}</TableCell>
+                            <TableCell>{transaction.transferId ?? '—'}</TableCell>
                             <TableCell>
                               {transaction.adjustmentReason
                                 ? `${formatAdjustmentReason(transaction.adjustmentReason)}${
