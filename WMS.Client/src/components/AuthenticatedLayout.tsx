@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import {
   Alert,
   AppBar,
   Avatar,
   Box,
   Button,
+  CircularProgress,
   Divider,
   Drawer,
   IconButton,
@@ -33,6 +35,7 @@ import MoveToInboxOutlinedIcon from '@mui/icons-material/MoveToInboxOutlined';
 import SwapHorizOutlinedIcon from '@mui/icons-material/SwapHorizOutlined';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
+import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import {
@@ -41,6 +44,12 @@ import {
 } from '@neondatabase/neon-js/auth/react/ui';
 import { Link as RouterLink, NavLink, Outlet } from 'react-router-dom';
 import { neon } from '../lib/neon';
+import { getCurrentWmsUser } from '../lib/api';
+import { queryKeys } from '../lib/queryKeys';
+import {
+  WmsAccessProvider,
+} from './WmsAccessContext';
+import { useWmsAccess } from '../hooks/useWmsAccess';
 import logoOpen from '../assets/logo-open.png';
 import logoClose from '../assets/logo-close.png';
 
@@ -67,6 +76,7 @@ const navigation = [
   },
   { label: 'Orders', to: '/orders', icon: <ShoppingCartOutlinedIcon /> },
   { label: 'Reports', to: '/reports', icon: <AssessmentOutlinedIcon /> },
+  { label: 'Users', to: '/users', icon: <ManageAccountsOutlinedIcon /> },
   {
     label: 'Transactions',
     to: '/inventory-transactions',
@@ -92,6 +102,7 @@ function ProfileMenu({
   compact?: boolean;
   onNavigate?: () => void;
 }) {
+  const wmsUser = useWmsAccess();
   const session = neon.auth.useSession();
   const user = session.data?.user;
   const [profileAnchor, setProfileAnchor] = useState<HTMLElement | null>(null);
@@ -220,6 +231,9 @@ function ProfileMenu({
                 {user.email}
               </Typography>
             )}
+            <Typography variant="caption" color="text.secondary" noWrap>
+              WMS role: {wmsUser.role.replace(/([a-z])([A-Z])/g, '$1 $2')}
+            </Typography>
           </Box>
         </Box>
         <Divider sx={{ my: 0.75 }} />
@@ -287,6 +301,19 @@ function SidebarContents({
   onToggle?: () => void;
   showAccount?: boolean;
 }) {
+  const wmsUser = useWmsAccess();
+  const visibleNavigation = navigation.filter((item) => {
+    if (item.to === '/users') return wmsUser.role === 'Admin';
+    if (
+      ['/receiving', '/inventory-adjustments', '/warehouse-transfers'].includes(
+        item.to,
+      )
+    ) {
+      return wmsUser.role !== 'Viewer';
+    }
+    return true;
+  });
+
   return (
     <Box
       sx={{
@@ -388,6 +415,15 @@ function SidebarContents({
           </IconButton>
         )}
       </Toolbar>
+      {!collapsed && (
+        <Typography
+          variant="caption"
+          color="text.secondary"
+          sx={{ px: 2.25, pb: 1, fontWeight: 600 }}
+        >
+          WMS role: {wmsUser.role.replace(/([a-z])([A-Z])/g, '$1 $2')}
+        </Typography>
+      )}
       <List
         sx={{
           px: 1.5,
@@ -396,7 +432,7 @@ function SidebarContents({
           gap: 0.5,
         }}
       >
-        {navigation.map((item) => (
+        {visibleNavigation.map((item) => (
           <Tooltip
             key={item.to}
             title={collapsed ? item.label : ''}
@@ -459,15 +495,13 @@ function SidebarContents({
   );
 }
 
-export function AuthenticatedLayout() {
+function AuthenticatedShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const closeMobileDrawer = () => setMobileOpen(false);
 
   return (
-    <>
-      <SignedIn>
-        <Box
+    <Box
           sx={{
             display: 'flex',
             minHeight: '100vh',
@@ -551,6 +585,65 @@ export function AuthenticatedLayout() {
             <AuthenticatedOutlet />
           </Box>
         </Box>
+  );
+}
+
+function WmsAccessGate() {
+  const userQuery = useQuery({
+    queryKey: queryKeys.wmsUsers.current,
+    queryFn: getCurrentWmsUser,
+    retry: false,
+  });
+
+  if (userQuery.isPending) {
+    return (
+      <Box
+        sx={{
+          minHeight: '100vh',
+          display: 'grid',
+          placeItems: 'center',
+          bgcolor: 'background.default',
+        }}
+      >
+        <CircularProgress aria-label="Checking WMS access" />
+      </Box>
+    );
+  }
+
+  if (userQuery.isError || !userQuery.data?.isActive) {
+    const status =
+      typeof userQuery.error === 'object' &&
+      userQuery.error !== null &&
+      'status' in userQuery.error
+        ? userQuery.error.status
+        : undefined;
+    const message =
+      status === 401
+        ? 'Your sign-in has expired. Sign in again to continue.'
+        : status === 403 || !userQuery.data?.isActive
+          ? 'Your WMS access is inactive or unavailable. Contact an administrator.'
+          : userQuery.error instanceof Error
+            ? userQuery.error.message
+            : 'WMS access could not be verified.';
+    return (
+      <Box sx={{ maxWidth: 640, mx: 'auto', p: 3 }}>
+        <Alert severity="error">{message}</Alert>
+      </Box>
+    );
+  }
+
+  return (
+    <WmsAccessProvider user={userQuery.data}>
+      <AuthenticatedShell />
+    </WmsAccessProvider>
+  );
+}
+
+export function AuthenticatedLayout() {
+  return (
+    <>
+      <SignedIn>
+        <WmsAccessGate />
       </SignedIn>
       <RedirectToSignIn />
     </>

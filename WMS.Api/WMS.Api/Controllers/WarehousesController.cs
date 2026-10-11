@@ -27,6 +27,7 @@ public sealed class WarehousesController(IWarehouseService warehouseService) : C
     }
 
     [HttpPost]
+    [Authorize(Policy = "WmsMasterWrite")]
     [ProducesResponseType(typeof(WarehouseResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -47,6 +48,7 @@ public sealed class WarehousesController(IWarehouseService warehouseService) : C
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = "WmsMasterWrite")]
     [ProducesResponseType(typeof(WarehouseResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -63,6 +65,7 @@ public sealed class WarehousesController(IWarehouseService warehouseService) : C
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = "WmsMasterWrite")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]

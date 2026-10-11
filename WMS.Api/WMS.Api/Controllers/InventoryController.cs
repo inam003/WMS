@@ -42,6 +42,7 @@ public sealed class InventoryController(IInventoryService inventoryService) : Co
     }
 
     [HttpPost("receipts")]
+    [Authorize(Policy = "WmsOperationalWrite")]
     [ProducesResponseType(typeof(InventoryTransactionResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(InventoryTransactionResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
@@ -73,6 +74,7 @@ public sealed class InventoryController(IInventoryService inventoryService) : Co
     }
 
     [HttpPost("adjustments")]
+    [Authorize(Policy = "WmsOperationalWrite")]
     [ProducesResponseType(typeof(InventoryTransactionResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(InventoryTransactionResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
@@ -104,6 +106,7 @@ public sealed class InventoryController(IInventoryService inventoryService) : Co
     }
 
     [HttpPost("transfers")]
+    [Authorize(Policy = "WmsOperationalWrite")]
     [ProducesResponseType(
         typeof(IReadOnlyList<InventoryTransactionResponse>),
         StatusCodes.Status201Created)]

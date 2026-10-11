@@ -49,6 +49,8 @@ import {
 import type { Product, ProductRequest } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
 import { generateInternalBarcode } from '../lib/barcode';
+import { useWmsAccess } from '../hooks/useWmsAccess';
+import { isMasterDataManager } from '../lib/wmsPermissions';
 
 interface ProductFormValues {
   sku: string;
@@ -109,6 +111,7 @@ function errorMessage(error: unknown): string {
 }
 
 export function Products() {
+  const canManage = isMasterDataManager(useWmsAccess().role);
   const queryClient = useQueryClient();
   const {
     data: products = [],
@@ -392,6 +395,7 @@ export function Products() {
                   variant="contained"
                   startIcon={<AddIcon />}
                   onClick={openCreateForm}
+                  disabled={!canManage}
                   sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}
                 >
                   Add product
@@ -493,6 +497,7 @@ export function Products() {
                       variant="contained"
                       startIcon={<AddIcon />}
                       onClick={openCreateForm}
+                      disabled={!canManage}
                     >
                       Add your first product
                     </Button>
@@ -575,6 +580,7 @@ export function Products() {
                                   <IconButton
                                     aria-label={`Edit ${product.name}`}
                                     onClick={() => openEditForm(product)}
+                                    disabled={!canManage}
                                     size="small"
                                   >
                                     <EditOutlinedIcon fontSize="small" />
@@ -586,6 +592,7 @@ export function Products() {
                                     color="error"
                                     onClick={() => setDeletingProduct(product)}
                                     size="small"
+                                    disabled={!canManage}
                                   >
                                     <DeleteOutlineIcon fontSize="small" />
                                   </IconButton>
@@ -894,7 +901,7 @@ export function Products() {
               <Button
                 type="submit"
                 variant="contained"
-                disabled={isSaving || !isFormValid}
+                disabled={!canManage || isSaving || !isFormValid}
                 startIcon={
                   isSaving ? <CircularProgress size={16} color="inherit" /> : null
                 }
@@ -910,14 +917,14 @@ export function Products() {
         </Dialog>
 
         <Dialog
-          open={Boolean(deletingProduct)}
+          open={canManage && Boolean(deletingProduct)}
           onClose={() => !isDeleting && setDeletingProduct(undefined)}
           maxWidth="xs"
           fullWidth
         >
           <DialogTitleWithClose
             onClose={() => !isDeleting && setDeletingProduct(undefined)}
-            disabled={isDeleting}
+            disabled={!canManage || isDeleting}
           >
             Delete product?
           </DialogTitleWithClose>
@@ -943,7 +950,7 @@ export function Products() {
               color="error"
               variant="contained"
               onClick={() => void removeProduct()}
-              disabled={isDeleting}
+              disabled={!canManage || isDeleting}
               startIcon={
                 isDeleting ? <CircularProgress size={16} color="inherit" /> : null
               }

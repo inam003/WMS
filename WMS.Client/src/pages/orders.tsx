@@ -40,6 +40,7 @@ import type {
   OrderRequest,
 } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
+import { useWmsAccess } from '../hooks/useWmsAccess';
 
 interface OrderFormLine {
   productId: string;
@@ -122,6 +123,9 @@ function toOrderRequest(form: OrderFormValues): OrderRequest | null {
 }
 
 export function Orders() {
+  const { role } = useWmsAccess();
+  const canManageOrders = role === 'Admin' || role === 'WarehouseManager';
+  const canDispatch = role !== 'Viewer';
   const queryClient = useQueryClient();
   const ordersQuery = useQuery({
     queryKey: queryKeys.orders.all,
@@ -388,7 +392,7 @@ export function Orders() {
               </Typography>
             </Box>
           </Stack>
-          <Button variant="contained" startIcon={<AddOutlinedIcon />} onClick={beginCreate}>
+          <Button variant="contained" startIcon={<AddOutlinedIcon />} onClick={beginCreate} disabled={!canManageOrders}>
             New order
           </Button>
         </Stack>
@@ -673,7 +677,7 @@ export function Orders() {
                           </Paper>
                         ))}
                       </Stack>
-                      {selectedOrder.status === 'Ready' && (
+                      {canDispatch && selectedOrder.status === 'Ready' && (
                         <Stack spacing={1.5}>
                           <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
                             Dispatch source locations
@@ -764,7 +768,7 @@ export function Orders() {
                         </Stack>
                       )}
                       <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap' }}>
-                        {selectedOrder.status === 'Draft' && (
+                        {canManageOrders && selectedOrder.status === 'Draft' && (
                           <>
                             <Button variant="outlined" onClick={() => beginEdit(selectedOrder)}>
                               Edit draft
@@ -778,7 +782,8 @@ export function Orders() {
                             </Button>
                           </>
                         )}
-                        {(selectedOrder.status === 'Draft' || selectedOrder.status === 'Ready') && (
+                        {canManageOrders &&
+                          (selectedOrder.status === 'Draft' || selectedOrder.status === 'Ready') && (
                           <Button
                             color="error"
                             onClick={() => cancelMutation.mutate(selectedOrder.id)}

@@ -1,11 +1,14 @@
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
 using WMS.Api.Authentication;
+using WMS.Api.Authorization;
 using WMS.Application.Categories;
 using WMS.Application.Inventory;
 using WMS.Application.InventoryTransactions;
 using WMS.Application.Products;
 using WMS.Application.Orders;
 using WMS.Application.Reports;
+using WMS.Application.Users;
 using WMS.Infrastructure.Categories;
 using WMS.Infrastructure.Data;
 using WMS.Infrastructure.InventoryData;
@@ -16,6 +19,7 @@ using WMS.Infrastructure.Locations;
 using WMS.Infrastructure.Products;
 using WMS.Infrastructure.Orders;
 using WMS.Infrastructure.Reports;
+using WMS.Infrastructure.Users;
 using WMS.Infrastructure.Warehouses;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -40,6 +44,11 @@ builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
 builder.Services.AddScoped<IReportsService, ReportsService>();
 builder.Services.AddScoped<IReportsRepository, ReportsRepository>();
+builder.Services.AddScoped<IWmsUserService, WmsUserService>();
+builder.Services.AddScoped<IWmsUserRepository, WmsUserRepository>();
+builder.Services.AddHttpContextAccessor();
+builder.Services.AddScoped<WmsRequestUser>();
+builder.Services.AddScoped<IAuthorizationHandler, WmsPermissionHandler>();
 
 var neonAuthBaseUrl = builder.Configuration["NEON_AUTH_BASE_URL"]
     ?? builder.Configuration["NeonAuth:BaseUrl"];
@@ -68,7 +77,29 @@ builder.Services
     .AddAuthentication("Neon")
     .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions,
         NeonJwtAuthenticationHandler>("Neon", _ => { });
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .AddRequirements(new WmsPermissionRequirement())
+        .Build();
+    options.FallbackPolicy = options.DefaultPolicy;
+    AddRolePolicy(options, "WmsAdmin", WMS.Domain.WmsRole.Admin);
+    AddRolePolicy(options, "WmsMasterWrite",
+        WMS.Domain.WmsRole.Admin,
+        WMS.Domain.WmsRole.WarehouseManager);
+    AddRolePolicy(options, "WmsOperationalWrite",
+        WMS.Domain.WmsRole.Admin,
+        WMS.Domain.WmsRole.WarehouseManager,
+        WMS.Domain.WmsRole.WarehouseOperator);
+    AddRolePolicy(options, "WmsOrderManage",
+        WMS.Domain.WmsRole.Admin,
+        WMS.Domain.WmsRole.WarehouseManager);
+    AddRolePolicy(options, "WmsDispatch",
+        WMS.Domain.WmsRole.Admin,
+        WMS.Domain.WmsRole.WarehouseManager,
+        WMS.Domain.WmsRole.WarehouseOperator);
+});
 
 var allowedOrigins = builder.Configuration
     .GetSection("Cors:AllowedOrigins")
@@ -106,3 +137,13 @@ app.UseAuthorization();
 app.MapControllers();
 
 app.Run();
+
+static void AddRolePolicy(
+    Microsoft.AspNetCore.Authorization.AuthorizationOptions options,
+    string name,
+    params WMS.Domain.WmsRole[] roles) =>
+    options.AddPolicy(name, policy =>
+    {
+        policy.RequireAuthenticatedUser();
+        policy.AddRequirements(new WmsPermissionRequirement(roles));
+    });

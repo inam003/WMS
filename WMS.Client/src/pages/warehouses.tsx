@@ -38,6 +38,8 @@ import {
 } from '../lib/api';
 import type { Warehouse, WarehouseRequest } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
+import { useWmsAccess } from '../hooks/useWmsAccess';
+import { isMasterDataManager } from '../lib/wmsPermissions';
 
 interface WarehouseFormValues {
   name: string;
@@ -60,6 +62,7 @@ function errorMessage(error: unknown): string {
 }
 
 export function Warehouses() {
+  const canManage = isMasterDataManager(useWmsAccess().role);
   const queryClient = useQueryClient();
   const {
     data: warehouses = [],
@@ -229,6 +232,7 @@ export function Warehouses() {
                   variant="contained"
                   startIcon={<AddIcon />}
                   onClick={openCreateForm}
+                  disabled={!canManage}
                   sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}
                 >
                   Add warehouse
@@ -272,7 +276,7 @@ export function Warehouses() {
                     <Typography color="text.secondary" sx={{ textAlign: 'center' }}>
                       Create a warehouse to begin organizing storage locations.
                     </Typography>
-                    <Button variant="contained" startIcon={<AddIcon />} onClick={openCreateForm}>
+                    <Button variant="contained" startIcon={<AddIcon />} onClick={openCreateForm} disabled={!canManage}>
                       Add your first warehouse
                     </Button>
                   </Stack>
@@ -300,6 +304,7 @@ export function Warehouses() {
                                 <IconButton
                                   aria-label={`Edit ${warehouse.name}`}
                                   onClick={() => openEditForm(warehouse)}
+                                  disabled={!canManage}
                                 >
                                   <EditOutlinedIcon />
                                 </IconButton>
@@ -312,6 +317,7 @@ export function Warehouses() {
                                     setActionError(undefined);
                                     setDeletingWarehouse(warehouse);
                                   }}
+                                  disabled={!canManage}
                                 >
                                   <DeleteOutlineIcon />
                                 </IconButton>
@@ -396,7 +402,7 @@ export function Warehouses() {
               <Button
                 type="submit"
                 variant="contained"
-                disabled={isSaving || !isFormValid}
+                disabled={!canManage || isSaving || !isFormValid}
               >
                 {isSaving ? 'Saving…' : formMode?.type === 'create' ? 'Create warehouse' : 'Save changes'}
               </Button>
@@ -404,7 +410,7 @@ export function Warehouses() {
           </Box>
         </Dialog>
         <Dialog
-          open={Boolean(deletingWarehouse)}
+          open={canManage && Boolean(deletingWarehouse)}
           onClose={() => !isDeleting && setDeletingWarehouse(undefined)}
           maxWidth="xs"
           fullWidth
@@ -423,7 +429,7 @@ export function Warehouses() {
           </DialogContent>
           <DialogActions sx={{ p: 2 }}>
             <Button onClick={() => setDeletingWarehouse(undefined)} disabled={isDeleting}>Cancel</Button>
-            <Button color="error" variant="contained" onClick={() => void removeWarehouse()} disabled={isDeleting}>
+            <Button color="error" variant="contained" onClick={() => void removeWarehouse()} disabled={!canManage || isDeleting}>
               {isDeleting ? 'Deleting…' : 'Delete'}
             </Button>
           </DialogActions>

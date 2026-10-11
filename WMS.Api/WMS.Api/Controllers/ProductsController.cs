@@ -38,6 +38,7 @@ public sealed class ProductsController(IProductService productService) : Control
     }
 
     [HttpPost]
+    [Authorize(Policy = "WmsMasterWrite")]
     [ProducesResponseType(typeof(ProductResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]
@@ -58,6 +59,7 @@ public sealed class ProductsController(IProductService productService) : Control
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = "WmsMasterWrite")]
     [ProducesResponseType(typeof(ProductResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -74,6 +76,7 @@ public sealed class ProductsController(IProductService productService) : Control
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = "WmsMasterWrite")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]

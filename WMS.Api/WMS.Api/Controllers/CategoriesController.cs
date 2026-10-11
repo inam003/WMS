@@ -27,6 +27,7 @@ public sealed class CategoriesController(ICategoryService categoryService) : Con
     }
 
     [HttpPost]
+    [Authorize(Policy = "WmsMasterWrite")]
     [ProducesResponseType(typeof(CategoryResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     public async Task<ActionResult<CategoryResponse>> Create(
@@ -46,6 +47,7 @@ public sealed class CategoriesController(ICategoryService categoryService) : Con
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = "WmsMasterWrite")]
     [ProducesResponseType(typeof(CategoryResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -61,6 +63,7 @@ public sealed class CategoriesController(ICategoryService categoryService) : Con
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = "WmsMasterWrite")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]

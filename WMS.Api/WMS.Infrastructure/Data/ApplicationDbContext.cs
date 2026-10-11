@@ -13,6 +13,7 @@ namespace WMS.Infrastructure.Data
         public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
         public DbSet<CustomerOrder> Orders => Set<CustomerOrder>();
         public DbSet<CustomerOrderLine> OrderLines => Set<CustomerOrderLine>();
+        public DbSet<WmsUserAssignment> WmsUserAssignments => Set<WmsUserAssignment>();
 
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) 
         { 

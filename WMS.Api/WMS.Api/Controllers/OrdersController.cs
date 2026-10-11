@@ -34,6 +34,7 @@ public sealed class OrdersController(IOrderService orderService) : ControllerBas
     }
 
     [HttpPost]
+    [Authorize(Policy = "WmsOrderManage")]
     [ProducesResponseType(typeof(OrderResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -55,6 +56,7 @@ public sealed class OrdersController(IOrderService orderService) : ControllerBas
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = "WmsOrderManage")]
     [ProducesResponseType(typeof(OrderResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
@@ -71,6 +73,7 @@ public sealed class OrdersController(IOrderService orderService) : ControllerBas
     }
 
     [HttpPost("{id:guid}/ready")]
+    [Authorize(Policy = "WmsOrderManage")]
     public async Task<ActionResult<OrderResponse>> MarkReady(
         Guid id,
         CancellationToken cancellationToken)
@@ -82,6 +85,7 @@ public sealed class OrdersController(IOrderService orderService) : ControllerBas
     }
 
     [HttpPost("{id:guid}/cancel")]
+    [Authorize(Policy = "WmsOrderManage")]
     public async Task<ActionResult<OrderResponse>> Cancel(
         Guid id,
         CancellationToken cancellationToken)
@@ -93,6 +97,7 @@ public sealed class OrdersController(IOrderService orderService) : ControllerBas
     }
 
     [HttpPost("{id:guid}/dispatch")]
+    [Authorize(Policy = "WmsDispatch")]
     [ProducesResponseType(typeof(IReadOnlyList<InventoryTransactionResponse>), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(IReadOnlyList<InventoryTransactionResponse>), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]

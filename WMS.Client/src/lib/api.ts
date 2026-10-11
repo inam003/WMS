@@ -4,6 +4,26 @@ export interface AuthenticatedApiUser {
   subject: string;
 }
 
+export type WmsRole =
+  | 'Admin'
+  | 'WarehouseManager'
+  | 'WarehouseOperator'
+  | 'Viewer';
+
+export interface WmsUser {
+  subject: string;
+  role: WmsRole;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface CurrentWmsUser {
+  subject: string;
+  role: WmsRole;
+  isActive: boolean;
+}
+
 export interface Product {
   id: string;
   sku: string;
@@ -440,6 +460,11 @@ export async function authenticatedApiRequest<T>(
       validationMessage ??
       problem.detail ??
       problem.title ??
+      (response.status === 401
+        ? 'Your sign-in is no longer valid. Sign in again to continue.'
+        : response.status === 403
+          ? 'Your WMS account does not have permission for this action.'
+          : undefined) ??
       `The API request failed (HTTP ${response.status}).`;
     throw new ApiError(message, response.status, problem.errors);
   }
@@ -461,6 +486,51 @@ export async function getAuthenticatedApiUser(): Promise<AuthenticatedApiUser> {
   if (!user) {
     throw new ApiError('The API returned no authenticated user.');
   }
+
+  return user;
+}
+
+export async function getCurrentWmsUser(): Promise<CurrentWmsUser> {
+  const user = await authenticatedApiRequest<CurrentWmsUser>('/api/users/me');
+  if (!user) throw new ApiError('The API returned no WMS access record.');
+  return user;
+}
+
+export async function getWmsUsers(signal?: AbortSignal): Promise<WmsUser[]> {
+  const users = await authenticatedApiRequest<WmsUser[]>('/api/users', { signal });
+  if (!Array.isArray(users)) throw new ApiError('The API returned an invalid WMS user list.');
+  return users;
+}
+
+export async function updateWmsUserRole(
+  subject: string,
+  role: WmsRole,
+): Promise<WmsUser> {
+  const user = await authenticatedApiRequest<WmsUser>(
+    `/api/users/${encodeURIComponent(subject)}/role`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ role }),
+    },
+  );
+  if (!user) throw new ApiError('The API returned no updated WMS user.');
+  return user;
+}
+
+export async function updateWmsUserAccess(
+  subject: string,
+  isActive: boolean,
+): Promise<WmsUser> {
+  const user = await authenticatedApiRequest<WmsUser>(
+    `/api/users/${encodeURIComponent(subject)}/access`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive }),
+    },
+  );
+  if (!user) throw new ApiError('The API returned no updated WMS user.');
   return user;
 }
 

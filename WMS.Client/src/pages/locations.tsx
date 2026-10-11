@@ -46,6 +46,8 @@ import {
 import type { Location, LocationRequest } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
 import { generateInternalBarcode } from '../lib/barcode';
+import { useWmsAccess } from '../hooks/useWmsAccess';
+import { isMasterDataManager } from '../lib/wmsPermissions';
 
 interface LocationFormValues {
   warehouseId: string;
@@ -72,6 +74,7 @@ function errorMessage(error: unknown): string {
 }
 
 export function Locations() {
+  const canManage = isMasterDataManager(useWmsAccess().role);
   const queryClient = useQueryClient();
   const {
     data: locations = [],
@@ -271,7 +274,7 @@ export function Locations() {
                   variant="contained"
                   startIcon={<AddIcon />}
                   onClick={openCreateForm}
-                  disabled={warehouses.length === 0}
+                  disabled={!canManage || warehouses.length === 0}
                   sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}
                 >
                   Add location
@@ -324,7 +327,7 @@ export function Locations() {
                       Add a location to a warehouse to organize inventory storage.
                     </Typography>
                     {warehouses.length > 0 && (
-                      <Button variant="contained" startIcon={<AddIcon />} onClick={openCreateForm}>
+                      <Button variant="contained" startIcon={<AddIcon />} onClick={openCreateForm} disabled={!canManage}>
                         Add your first location
                       </Button>
                     )}
@@ -369,6 +372,7 @@ export function Locations() {
                                 <IconButton
                                   aria-label={`Edit ${location.name}`}
                                   onClick={() => openEditForm(location)}
+                                  disabled={!canManage}
                                 >
                                   <EditOutlinedIcon />
                                 </IconButton>
@@ -381,6 +385,7 @@ export function Locations() {
                                     setActionError(undefined);
                                     setDeletingLocation(location);
                                   }}
+                                  disabled={!canManage}
                                 >
                                   <DeleteOutlineIcon />
                                 </IconButton>
@@ -510,7 +515,7 @@ export function Locations() {
               <Button
                 type="submit"
                 variant="contained"
-                disabled={isSaving || !isFormValid}
+                disabled={!canManage || isSaving || !isFormValid}
               >
                 {isSaving ? 'Saving…' : formMode?.type === 'create' ? 'Create location' : 'Save changes'}
               </Button>
@@ -518,7 +523,7 @@ export function Locations() {
           </Box>
         </Dialog>
         <Dialog
-          open={Boolean(deletingLocation)}
+          open={canManage && Boolean(deletingLocation)}
           onClose={() => !isDeleting && setDeletingLocation(undefined)}
           maxWidth="xs"
           fullWidth
@@ -537,7 +542,7 @@ export function Locations() {
           </DialogContent>
           <DialogActions sx={{ p: 2 }}>
             <Button onClick={() => setDeletingLocation(undefined)} disabled={isDeleting}>Cancel</Button>
-            <Button color="error" variant="contained" onClick={() => void removeLocation()} disabled={isDeleting}>
+            <Button color="error" variant="contained" onClick={() => void removeLocation()} disabled={!canManage || isDeleting}>
               {isDeleting ? 'Deleting…' : 'Delete'}
             </Button>
           </DialogActions>

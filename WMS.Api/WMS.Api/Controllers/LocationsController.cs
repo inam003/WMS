@@ -38,6 +38,7 @@ public sealed class LocationsController(ILocationService locationService) : Cont
     }
 
     [HttpPost]
+    [Authorize(Policy = "WmsMasterWrite")]
     [ProducesResponseType(typeof(LocationResponse), StatusCodes.Status201Created)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -59,6 +60,7 @@ public sealed class LocationsController(ILocationService locationService) : Cont
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = "WmsMasterWrite")]
     [ProducesResponseType(typeof(LocationResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -75,6 +77,7 @@ public sealed class LocationsController(ILocationService locationService) : Cont
     }
 
     [HttpDelete("{id:guid}")]
+    [Authorize(Policy = "WmsMasterWrite")]
     [ProducesResponseType(StatusCodes.Status204NoContent)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
     [ProducesResponseType(StatusCodes.Status409Conflict)]

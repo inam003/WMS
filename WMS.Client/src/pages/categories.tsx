@@ -36,6 +36,8 @@ import {
 } from '../lib/api';
 import type { Category, CategoryRequest } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
+import { useWmsAccess } from '../hooks/useWmsAccess';
+import { isMasterDataManager } from '../lib/wmsPermissions';
 
 interface CategoryFormValues {
   name: string;
@@ -51,6 +53,7 @@ function errorMessage(error: unknown): string {
 }
 
 export function Categories() {
+  const canManage = isMasterDataManager(useWmsAccess().role);
   const queryClient = useQueryClient();
   const {
     data: categories = [],
@@ -218,6 +221,7 @@ export function Categories() {
                   variant="contained"
                   startIcon={<AddIcon />}
                   onClick={openCreateForm}
+                  disabled={!canManage}
                   sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}
                 >
                   Add category
@@ -287,6 +291,7 @@ export function Categories() {
                       variant="contained"
                       startIcon={<AddIcon />}
                       onClick={openCreateForm}
+                      disabled={!canManage}
                     >
                       Add your first category
                     </Button>
@@ -321,6 +326,7 @@ export function Categories() {
                                 <IconButton
                                   aria-label={`Edit ${category.name}`}
                                   onClick={() => openEditForm(category)}
+                                  disabled={!canManage}
                                 >
                                   <EditOutlinedIcon />
                                 </IconButton>
@@ -333,6 +339,7 @@ export function Categories() {
                                     setActionError(undefined);
                                     setDeletingCategory(category);
                                   }}
+                                  disabled={!canManage}
                                 >
                                   <DeleteOutlineIcon />
                                 </IconButton>
@@ -403,7 +410,7 @@ export function Categories() {
               <Button
                 type="submit"
                 variant="contained"
-                disabled={isSaving || !isFormValid}
+                disabled={!canManage || isSaving || !isFormValid}
                 startIcon={
                   isSaving ? <CircularProgress size={16} color="inherit" /> : null
                 }
@@ -419,14 +426,14 @@ export function Categories() {
         </Dialog>
 
         <Dialog
-          open={Boolean(deletingCategory)}
+          open={canManage && Boolean(deletingCategory)}
           onClose={() => !isDeleting && setDeletingCategory(undefined)}
           maxWidth="xs"
           fullWidth
         >
           <DialogTitleWithClose
             onClose={() => !isDeleting && setDeletingCategory(undefined)}
-            disabled={isDeleting}
+            disabled={!canManage || isDeleting}
           >
             Delete category?
           </DialogTitleWithClose>
@@ -452,7 +459,7 @@ export function Categories() {
               color="error"
               variant="contained"
               onClick={() => void removeCategory()}
-              disabled={isDeleting}
+              disabled={!canManage || isDeleting}
               startIcon={
                 isDeleting ? <CircularProgress size={16} color="inherit" /> : null
               }

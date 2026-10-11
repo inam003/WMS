@@ -33,6 +33,10 @@ export const queryKeys = {
   reports: {
     page: (kind: string, filters: object) => ['reports', kind, filters] as const,
   },
+  wmsUsers: {
+    current: ['wms-user', 'current'] as const,
+    all: ['wms-users'] as const,
+  },
 };
 
 interface InventoryQueryFilters {

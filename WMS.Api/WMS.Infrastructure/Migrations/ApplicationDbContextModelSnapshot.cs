@@ -358,6 +358,40 @@ namespace WMS.Infrastructure.Migrations
                     b.ToTable("Warehouses");
                 });
 
+            modelBuilder.Entity("WMS.Domain.WmsUserAssignment", b =>
+                {
+                    b.Property<string>("Subject")
+                        .HasMaxLength(255)
+                        .HasColumnType("character varying(255)");
+
+                    b.Property<DateTimeOffset>("CreatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.Property<bool>("IsActive")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("boolean")
+                        .HasDefaultValue(true);
+
+                    b.Property<string>("Role")
+                        .IsRequired()
+                        .HasMaxLength(32)
+                        .HasColumnType("character varying(32)");
+
+                    b.Property<DateTimeOffset>("UpdatedAt")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("timestamp with time zone")
+                        .HasDefaultValueSql("CURRENT_TIMESTAMP");
+
+                    b.HasKey("Subject");
+
+                    b.ToTable("WmsUserAssignments", t =>
+                        {
+                            t.HasCheckConstraint("CK_WmsUserAssignments_Role", "\"Role\" IN ('Admin', 'WarehouseManager', 'WarehouseOperator', 'Viewer')");
+                        });
+                });
+
             modelBuilder.Entity("WMS.Domain.CustomerOrderLine", b =>
                 {
                     b.HasOne("WMS.Domain.Location", "DispatchLocation")
