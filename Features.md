@@ -51,6 +51,8 @@
 * Damaged/lost/found
 * Manual corrections
 * Adjustment history
+* Increase/decrease with a required reason
+* Idempotent adjustments that prevent negative stock
 
 
 
@@ -105,7 +107,6 @@
 * Permission checks
 * Negative-stock prevention
 * Transaction consistency
-
 
 
 

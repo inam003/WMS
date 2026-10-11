@@ -9,6 +9,8 @@ public class InventoryTransaction
     public string Type { get; set; } = string.Empty;
     public Guid? ReferenceId { get; set; }
     public Guid? IdempotencyKey { get; set; }
+    public InventoryAdjustmentReason? AdjustmentReason { get; set; }
+    public string? AdjustmentExplanation { get; set; }
     public string CreatedBy { get; set; } = string.Empty;
     public DateTimeOffset CreatedAt { get; set; }
     public Product Product { get; set; } = null!;

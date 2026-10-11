@@ -29,7 +29,7 @@ public sealed class InventoryRepository(ApplicationDbContext dbContext) : IInven
             .Select(location => (bool?)(location.IsActive && location.Warehouse.IsActive))
             .SingleOrDefaultAsync(cancellationToken);
 
-    public Task<InventoryTransactionResponse?> GetReceiptByIdempotencyKeyAsync(
+    public Task<InventoryTransactionResponse?> GetTransactionByIdempotencyKeyAsync(
         string createdBy,
         Guid idempotencyKey,
         CancellationToken cancellationToken) =>
@@ -76,8 +76,9 @@ public sealed class InventoryRepository(ApplicationDbContext dbContext) : IInven
             .Select(ToResponse)
             .SingleOrDefaultAsync(cancellationToken);
 
-    public async Task<ReceiptPersistenceResult> ReceiveAsync(
+    public async Task<InventoryMovementPersistenceResult> ApplyInventoryMovementAsync(
         WMS.Domain.InventoryTransaction transaction,
+        decimal quantityDelta,
         CancellationToken cancellationToken)
     {
         await using var databaseTransaction =
@@ -106,36 +107,62 @@ public sealed class InventoryRepository(ApplicationDbContext dbContext) : IInven
             }
 
             var isReplay =
+                existing.Type == transaction.Type &&
                 existing.ProductId == transaction.ProductId &&
                 existing.LocationId == transaction.LocationId &&
                 existing.Quantity == transaction.Quantity &&
-                existing.ReferenceId == transaction.ReferenceId;
+                existing.ReferenceId == transaction.ReferenceId &&
+                existing.AdjustmentReason == transaction.AdjustmentReason &&
+                existing.AdjustmentExplanation == transaction.AdjustmentExplanation;
 
-            return new ReceiptPersistenceResult(
+            return new InventoryMovementPersistenceResult(
                 isReplay
-                    ? ReceiptPersistenceStatus.Replayed
-                    : ReceiptPersistenceStatus.IdempotencyConflict,
+                    ? InventoryMovementPersistenceStatus.Replayed
+                    : InventoryMovementPersistenceStatus.IdempotencyConflict,
                 existing);
         }
 
         try
         {
-            await dbContext.Database.ExecuteSqlInterpolatedAsync(
-                $"""
-                INSERT INTO "Inventory" ("Id", "ProductId", "LocationId", "Quantity")
-                VALUES ({Guid.NewGuid()}, {transaction.ProductId}, {transaction.LocationId}, {transaction.Quantity})
-                ON CONFLICT ("ProductId", "LocationId")
-                DO UPDATE SET "Quantity" = "Inventory"."Quantity" + EXCLUDED."Quantity"
-                """,
-                cancellationToken);
+            if (quantityDelta > 0)
+            {
+                await dbContext.Database.ExecuteSqlInterpolatedAsync(
+                    $"""
+                    INSERT INTO "Inventory" ("Id", "ProductId", "LocationId", "Quantity")
+                    VALUES ({Guid.NewGuid()}, {transaction.ProductId}, {transaction.LocationId}, {quantityDelta})
+                    ON CONFLICT ("ProductId", "LocationId")
+                    DO UPDATE SET "Quantity" = "Inventory"."Quantity" + EXCLUDED."Quantity"
+                    """,
+                    cancellationToken);
+            }
+            else
+            {
+                var rowsUpdated = await dbContext.Database.ExecuteSqlInterpolatedAsync(
+                    $"""
+                    UPDATE "Inventory"
+                    SET "Quantity" = "Quantity" + {quantityDelta}
+                    WHERE "ProductId" = {transaction.ProductId}
+                      AND "LocationId" = {transaction.LocationId}
+                      AND "Quantity" >= {-quantityDelta}
+                    """,
+                    cancellationToken);
+                if (rowsUpdated == 0)
+                {
+                    await databaseTransaction.RollbackAsync(cancellationToken);
+                    dbContext.Entry(transaction).State = EntityState.Detached;
+                    return new InventoryMovementPersistenceResult(
+                        InventoryMovementPersistenceStatus.InsufficientInventory,
+                        null);
+                }
+            }
         }
         catch (PostgresException exception) when (
             exception.SqlState == PostgresErrorCodes.NumericValueOutOfRange)
         {
             await databaseTransaction.RollbackAsync(cancellationToken);
             dbContext.Entry(transaction).State = EntityState.Detached;
-            return new ReceiptPersistenceResult(
-                ReceiptPersistenceStatus.QuantityLimitExceeded,
+            return new InventoryMovementPersistenceResult(
+                InventoryMovementPersistenceStatus.QuantityLimitExceeded,
                 null);
         }
 
@@ -151,7 +178,9 @@ public sealed class InventoryRepository(ApplicationDbContext dbContext) : IInven
                 "The receipt was committed, but its transaction record could not be loaded.");
         }
 
-        return new ReceiptPersistenceResult(ReceiptPersistenceStatus.Created, created);
+        return new InventoryMovementPersistenceResult(
+            InventoryMovementPersistenceStatus.Created,
+            created);
     }
 
     private Task<InventoryTransactionResponse?> FindByIdempotencyKeyAsync(
@@ -213,5 +242,7 @@ public sealed class InventoryRepository(ApplicationDbContext dbContext) : IInven
             transaction.Type,
             transaction.ReferenceId,
             transaction.CreatedBy,
-            transaction.CreatedAt);
+            transaction.CreatedAt,
+            transaction.AdjustmentReason,
+            transaction.AdjustmentExplanation);
 }

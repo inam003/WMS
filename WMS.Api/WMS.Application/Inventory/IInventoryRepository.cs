@@ -15,11 +15,12 @@ public interface IInventoryRepository
         CancellationToken cancellationToken);
     Task<bool?> GetProductActiveAsync(Guid id, CancellationToken cancellationToken);
     Task<bool?> GetLocationActiveAsync(Guid id, CancellationToken cancellationToken);
-    Task<InventoryTransactionResponse?> GetReceiptByIdempotencyKeyAsync(
+    Task<InventoryTransactionResponse?> GetTransactionByIdempotencyKeyAsync(
         string createdBy,
         Guid idempotencyKey,
         CancellationToken cancellationToken);
-    Task<ReceiptPersistenceResult> ReceiveAsync(
+    Task<InventoryMovementPersistenceResult> ApplyInventoryMovementAsync(
         WMS.Domain.InventoryTransaction transaction,
+        decimal quantityDelta,
         CancellationToken cancellationToken);
 }

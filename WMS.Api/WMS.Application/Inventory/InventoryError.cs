@@ -12,5 +12,6 @@ public enum InventoryError
     InactiveProduct,
     InactiveLocation,
     IdempotencyConflict,
-    QuantityLimitExceeded
+    QuantityLimitExceeded,
+    InsufficientInventory
 }

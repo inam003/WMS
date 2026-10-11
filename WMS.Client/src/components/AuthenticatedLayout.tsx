@@ -23,6 +23,7 @@ import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
+import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import WarehouseOutlinedIcon from '@mui/icons-material/WarehouseOutlined';
 import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
@@ -50,6 +51,11 @@ const navigation = [
   { label: 'Warehouses', to: '/warehouses', icon: <WarehouseOutlinedIcon /> },
   { label: 'Locations', to: '/locations', icon: <PlaceOutlinedIcon /> },
   { label: 'Inventory', to: '/inventory', icon: <StorageOutlinedIcon /> },
+  {
+    label: 'Adjustments',
+    to: '/inventory-adjustments',
+    icon: <TuneOutlinedIcon />,
+  },
   { label: 'Receiving', to: '/receiving', icon: <MoveToInboxOutlinedIcon /> },
   {
     label: 'Transactions',

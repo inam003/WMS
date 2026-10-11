@@ -5,6 +5,7 @@ import { AuthenticatedLayout } from './components/AuthenticatedLayout';
 import { Categories } from './pages/categories';
 import { Home } from './pages/home';
 import { Inventory } from './pages/inventory';
+import { InventoryAdjustments } from './pages/inventory-adjustments';
 import { InventoryTransactions } from './pages/inventory-transactions';
 import { Locations } from './pages/locations';
 import { Products } from './pages/products';
@@ -23,6 +24,7 @@ export default function App() {
         <Route path="/warehouses" element={<Warehouses />} />
         <Route path="/locations" element={<Locations />} />
         <Route path="/inventory" element={<Inventory />} />
+        <Route path="/inventory-adjustments" element={<InventoryAdjustments />} />
         <Route path="/receiving" element={<Receiving />} />
         <Route
           path="/inventory-transactions"

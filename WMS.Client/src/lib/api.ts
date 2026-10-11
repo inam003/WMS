@@ -98,6 +98,8 @@ export interface InventoryTransaction {
   referenceId: string | null;
   createdBy: string;
   createdAt: string;
+  adjustmentReason: string | null;
+  adjustmentExplanation: string | null;
 }
 
 export interface InventoryTransactionFilters {
@@ -120,6 +122,22 @@ export interface InventoryReceiptRequest {
   locationId: string;
   quantity: number;
   referenceId: string | null;
+}
+
+export type InventoryAdjustmentType = 'Increase' | 'Decrease';
+export type InventoryAdjustmentReason =
+  | 'DamagedStock'
+  | 'LostOrMissingStock'
+  | 'PhysicalCountCorrection'
+  | 'Other';
+
+export interface InventoryAdjustmentRequest {
+  productId: string;
+  locationId: string;
+  type: InventoryAdjustmentType;
+  quantity: number;
+  reason: InventoryAdjustmentReason;
+  explanation: string | null;
 }
 
 interface ProblemDetails {
@@ -468,6 +486,20 @@ export async function receiveInventory(
   idempotencyKey: string,
 ): Promise<InventoryTransaction | null> {
   return authenticatedApiRequest<InventoryTransaction>('/api/inventory/receipts', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify(request),
+  });
+}
+
+export async function adjustInventory(
+  request: InventoryAdjustmentRequest,
+  idempotencyKey: string,
+): Promise<InventoryTransaction | null> {
+  return authenticatedApiRequest<InventoryTransaction>('/api/inventory/adjustments', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

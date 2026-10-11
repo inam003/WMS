@@ -1,8 +1,12 @@
+using WMS.Domain;
+
 namespace WMS.Application.Inventory;
 
 public sealed class InventoryService(IInventoryRepository repository) : IInventoryService
 {
     private const string ReceiptTransactionType = "Receipt";
+    private const int MaximumQuantityPrecision = 3;
+    private const decimal MaximumQuantity = 999999999999999.999m;
 
     public async Task<InventoryOperationResult<IReadOnlyList<InventoryResponse>>> GetAllAsync(
         InventoryQuery query,
@@ -62,28 +66,105 @@ public sealed class InventoryService(IInventoryRepository repository) : IInvento
             : InventoryOperationResult<InventoryResponse>.Success(inventory);
     }
 
-    public async Task<InventoryOperationResult<ReceiptResult>> ReceiveAsync(
+    public async Task<InventoryOperationResult<InventoryMovementResult>> ReceiveAsync(
         CreateReceiptRequest request,
+        string? idempotencyKey,
+        string? createdBy,
+        CancellationToken cancellationToken) =>
+        await ApplyMovementAsync(
+            request.ProductId,
+            request.LocationId,
+            request.Quantity,
+            ReceiptTransactionType,
+            request.ReferenceId,
+            null,
+            null,
+            1,
+            idempotencyKey,
+            createdBy,
+            cancellationToken);
+
+    public async Task<InventoryOperationResult<InventoryMovementResult>> AdjustAsync(
+        CreateInventoryAdjustmentRequest request,
         string? idempotencyKey,
         string? createdBy,
         CancellationToken cancellationToken)
     {
         var validationErrors = new Dictionary<string, string[]>();
-        if (request.ProductId == Guid.Empty)
+        if (request.Type is not InventoryAdjustmentType.Increase and
+            not InventoryAdjustmentType.Decrease)
         {
-            validationErrors[nameof(request.ProductId)] = ["ProductId must not be empty."];
+            validationErrors[nameof(request.Type)] = ["Select Increase or Decrease."];
         }
 
-        if (request.LocationId == Guid.Empty)
+        if (request.Reason is InventoryAdjustmentReason.Unspecified ||
+            !Enum.IsDefined(request.Reason))
         {
-            validationErrors[nameof(request.LocationId)] = ["LocationId must not be empty."];
+            validationErrors[nameof(request.Reason)] = ["Select a valid adjustment reason."];
         }
 
-        if (request.Quantity <= 0 ||
-            request.Quantity > 999999999999999.999m ||
-            decimal.Round(request.Quantity, 3) != request.Quantity)
+        var explanation = request.Explanation?.Trim();
+        if (request.Reason == InventoryAdjustmentReason.Other &&
+            string.IsNullOrWhiteSpace(explanation))
         {
-            validationErrors[nameof(request.Quantity)] =
+            validationErrors[nameof(request.Explanation)] =
+                ["An explanation is required when the reason is Other."];
+        }
+        else if (explanation?.Length > 500)
+        {
+            validationErrors[nameof(request.Explanation)] =
+                ["Explanation must be 500 characters or fewer."];
+        }
+
+        if (validationErrors.Count > 0)
+        {
+            return InventoryOperationResult<InventoryMovementResult>.InvalidRequest(validationErrors);
+        }
+
+        var isIncrease = request.Type == InventoryAdjustmentType.Increase;
+        return await ApplyMovementAsync(
+            request.ProductId,
+            request.LocationId,
+            request.Quantity,
+            isIncrease ? "AdjustmentIncrease" : "AdjustmentDecrease",
+            null,
+            request.Reason,
+            explanation,
+            isIncrease ? 1 : -1,
+            idempotencyKey,
+            createdBy,
+            cancellationToken);
+    }
+
+    private async Task<InventoryOperationResult<InventoryMovementResult>> ApplyMovementAsync(
+        Guid productId,
+        Guid locationId,
+        decimal quantity,
+        string transactionType,
+        Guid? referenceId,
+        InventoryAdjustmentReason? adjustmentReason,
+        string? adjustmentExplanation,
+        int direction,
+        string? idempotencyKey,
+        string? createdBy,
+        CancellationToken cancellationToken)
+    {
+        var validationErrors = new Dictionary<string, string[]>();
+        if (productId == Guid.Empty)
+        {
+            validationErrors["ProductId"] = ["ProductId must not be empty."];
+        }
+
+        if (locationId == Guid.Empty)
+        {
+            validationErrors["LocationId"] = ["LocationId must not be empty."];
+        }
+
+        if (quantity <= 0 ||
+            quantity > MaximumQuantity ||
+            decimal.Round(quantity, MaximumQuantityPrecision) != quantity)
+        {
+            validationErrors["Quantity"] =
                 ["Quantity must be greater than zero and support no more than three decimal places."];
         }
 
@@ -100,94 +181,105 @@ public sealed class InventoryService(IInventoryRepository repository) : IInvento
 
         if (validationErrors.Count > 0)
         {
-            return InventoryOperationResult<ReceiptResult>.InvalidRequest(validationErrors);
+            return InventoryOperationResult<InventoryMovementResult>.InvalidRequest(validationErrors);
         }
 
-        var existingReceipt = await repository.GetReceiptByIdempotencyKeyAsync(
+        var existingTransaction = await repository.GetTransactionByIdempotencyKeyAsync(
             createdBy!,
             parsedIdempotencyKey,
             cancellationToken);
-        if (existingReceipt is not null)
+        if (existingTransaction is not null)
         {
             var isReplay =
-                existingReceipt.Type == ReceiptTransactionType &&
-                existingReceipt.ProductId == request.ProductId &&
-                existingReceipt.LocationId == request.LocationId &&
-                existingReceipt.Quantity == request.Quantity &&
-                existingReceipt.ReferenceId == request.ReferenceId;
+                existingTransaction.Type == transactionType &&
+                existingTransaction.ProductId == productId &&
+                existingTransaction.LocationId == locationId &&
+                existingTransaction.Quantity == quantity &&
+                existingTransaction.ReferenceId == referenceId &&
+                existingTransaction.AdjustmentReason == adjustmentReason &&
+                existingTransaction.AdjustmentExplanation == adjustmentExplanation;
             if (!isReplay)
             {
-                return InventoryOperationResult<ReceiptResult>.Failure(
+                return InventoryOperationResult<InventoryMovementResult>.Failure(
                     InventoryError.IdempotencyConflict);
             }
 
-            return InventoryOperationResult<ReceiptResult>.Success(
-                new ReceiptResult(existingReceipt, true));
+            return InventoryOperationResult<InventoryMovementResult>.Success(
+                new InventoryMovementResult(existingTransaction, true));
         }
 
         var productIsActive = await repository.GetProductActiveAsync(
-            request.ProductId,
+            productId,
             cancellationToken);
         if (!productIsActive.HasValue)
         {
-            return InventoryOperationResult<ReceiptResult>.Failure(
+            return InventoryOperationResult<InventoryMovementResult>.Failure(
                 InventoryError.ProductNotFound);
         }
 
         if (!productIsActive.Value)
         {
-            return InventoryOperationResult<ReceiptResult>.Failure(
+            return InventoryOperationResult<InventoryMovementResult>.Failure(
                 InventoryError.InactiveProduct);
         }
 
         var locationIsActive = await repository.GetLocationActiveAsync(
-            request.LocationId,
+            locationId,
             cancellationToken);
         if (!locationIsActive.HasValue)
         {
-            return InventoryOperationResult<ReceiptResult>.Failure(
+            return InventoryOperationResult<InventoryMovementResult>.Failure(
                 InventoryError.LocationNotFound);
         }
 
         if (!locationIsActive.Value)
         {
-            return InventoryOperationResult<ReceiptResult>.Failure(
+            return InventoryOperationResult<InventoryMovementResult>.Failure(
                 InventoryError.InactiveLocation);
         }
 
-        var persistenceResult = await repository.ReceiveAsync(
+        var persistenceResult = await repository.ApplyInventoryMovementAsync(
             new WMS.Domain.InventoryTransaction
             {
                 Id = Guid.NewGuid(),
-                ProductId = request.ProductId,
-                LocationId = request.LocationId,
-                Quantity = request.Quantity,
-                Type = ReceiptTransactionType,
-                ReferenceId = request.ReferenceId,
+                ProductId = productId,
+                LocationId = locationId,
+                Quantity = quantity,
+                Type = transactionType,
+                ReferenceId = referenceId,
                 IdempotencyKey = parsedIdempotencyKey,
+                AdjustmentReason = adjustmentReason,
+                AdjustmentExplanation = adjustmentExplanation,
                 CreatedBy = createdBy!
             },
+            quantity * direction,
             cancellationToken);
 
-        if (persistenceResult.Status == ReceiptPersistenceStatus.IdempotencyConflict)
+        if (persistenceResult.Status == InventoryMovementPersistenceStatus.IdempotencyConflict)
         {
-            return InventoryOperationResult<ReceiptResult>.Failure(
+            return InventoryOperationResult<InventoryMovementResult>.Failure(
                 InventoryError.IdempotencyConflict);
         }
 
-        if (persistenceResult.Status == ReceiptPersistenceStatus.QuantityLimitExceeded)
+        if (persistenceResult.Status == InventoryMovementPersistenceStatus.QuantityLimitExceeded)
         {
-            return InventoryOperationResult<ReceiptResult>.Failure(
+            return InventoryOperationResult<InventoryMovementResult>.Failure(
                 InventoryError.QuantityLimitExceeded);
+        }
+
+        if (persistenceResult.Status == InventoryMovementPersistenceStatus.InsufficientInventory)
+        {
+            return InventoryOperationResult<InventoryMovementResult>.Failure(
+                InventoryError.InsufficientInventory);
         }
 
         var savedTransaction = persistenceResult.Transaction
             ?? throw new InvalidOperationException(
-                "A successful receipt persistence result must include its transaction.");
-        return InventoryOperationResult<ReceiptResult>.Success(
-            new ReceiptResult(
+                "A successful inventory movement must include its transaction.");
+        return InventoryOperationResult<InventoryMovementResult>.Success(
+            new InventoryMovementResult(
                 savedTransaction,
-                persistenceResult.Status == ReceiptPersistenceStatus.Replayed));
+                persistenceResult.Status == InventoryMovementPersistenceStatus.Replayed));
     }
 
     private static Dictionary<string, string[]> ValidateQuery(InventoryQuery query)

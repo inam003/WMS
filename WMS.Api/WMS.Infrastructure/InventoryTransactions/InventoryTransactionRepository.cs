@@ -92,5 +92,7 @@ public sealed class InventoryTransactionRepository(
             transaction.Type,
             transaction.ReferenceId,
             transaction.CreatedBy,
-            transaction.CreatedAt);
+            transaction.CreatedAt,
+            transaction.AdjustmentReason,
+            transaction.AdjustmentExplanation);
 }

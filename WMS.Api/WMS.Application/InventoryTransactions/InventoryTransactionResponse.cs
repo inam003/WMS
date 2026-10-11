@@ -1,3 +1,6 @@
+using System.Text.Json.Serialization;
+using WMS.Domain;
+
 namespace WMS.Application.InventoryTransactions;
 
 public sealed record InventoryTransactionResponse(
@@ -14,4 +17,7 @@ public sealed record InventoryTransactionResponse(
     string Type,
     Guid? ReferenceId,
     string CreatedBy,
-    DateTimeOffset CreatedAt);
+    DateTimeOffset CreatedAt,
+    [property: JsonConverter(typeof(JsonStringEnumConverter<InventoryAdjustmentReason>))]
+    InventoryAdjustmentReason? AdjustmentReason,
+    string? AdjustmentExplanation);

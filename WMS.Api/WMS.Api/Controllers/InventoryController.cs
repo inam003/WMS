@@ -72,6 +72,37 @@ public sealed class InventoryController(IInventoryService inventoryService) : Co
             result.Value.Transaction);
     }
 
+    [HttpPost("adjustments")]
+    [ProducesResponseType(typeof(InventoryTransactionResponse), StatusCodes.Status201Created)]
+    [ProducesResponseType(typeof(InventoryTransactionResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ValidationProblemDetails), StatusCodes.Status400BadRequest)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status404NotFound)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status409Conflict)]
+    public async Task<ActionResult<InventoryTransactionResponse>> Adjust(
+        CreateInventoryAdjustmentRequest request,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey,
+        CancellationToken cancellationToken)
+    {
+        var result = await inventoryService.AdjustAsync(
+            request,
+            idempotencyKey,
+            User.FindFirst("sub")?.Value,
+            cancellationToken);
+        if (!result.Succeeded)
+        {
+            return ToErrorResponse(result.Error, result.ValidationErrors);
+        }
+
+        if (result.Value!.IsReplay)
+        {
+            return Ok(result.Value.Transaction);
+        }
+
+        return Created(
+            $"/api/inventory-transactions/{result.Value.Transaction.Id}",
+            result.Value.Transaction);
+    }
+
     private ActionResult ToErrorResponse(
         InventoryError error,
         IReadOnlyDictionary<string, string[]>? validationErrors) =>
@@ -119,6 +150,11 @@ public sealed class InventoryController(IInventoryService inventoryService) : Co
             {
                 Status = StatusCodes.Status409Conflict,
                 Title = "The resulting inventory quantity exceeds the supported limit."
+            }),
+            InventoryError.InsufficientInventory => Conflict(new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "The adjustment would reduce inventory below zero."
             }),
             InventoryError.NotFound => NotFound(),
             InventoryError.None => throw new InvalidOperationException(

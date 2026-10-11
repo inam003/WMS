@@ -78,6 +78,19 @@ function formatDate(value: string): string {
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 
+function formatTransactionType(type: string): string {
+  if (type === 'AdjustmentIncrease') return 'Adjustment - Increase';
+  if (type === 'AdjustmentDecrease') return 'Adjustment - Decrease';
+  return type;
+}
+
+function formatAdjustmentReason(reason: string | null): string {
+  if (reason === 'DamagedStock') return 'Damaged stock';
+  if (reason === 'LostOrMissingStock') return 'Lost or missing stock';
+  if (reason === 'PhysicalCountCorrection') return 'Physical count correction';
+  return reason ?? '—';
+}
+
 export function InventoryTransactions() {
   const productsQuery = useQuery({
     queryKey: queryKeys.products.list,
@@ -393,6 +406,7 @@ export function InventoryTransactions() {
                           <TableCell>Product</TableCell>
                           <TableCell>SKU</TableCell>
                           <TableCell>Type</TableCell>
+                          <TableCell>Adjustment reason</TableCell>
                           <TableCell align="right">Quantity</TableCell>
                           <TableCell>Warehouse</TableCell>
                           <TableCell>Location</TableCell>
@@ -408,7 +422,16 @@ export function InventoryTransactions() {
                             </TableCell>
                             <TableCell>{transaction.productName}</TableCell>
                             <TableCell>{transaction.sku}</TableCell>
-                            <TableCell>{transaction.type}</TableCell>
+                            <TableCell>{formatTransactionType(transaction.type)}</TableCell>
+                            <TableCell>
+                              {transaction.adjustmentReason
+                                ? `${formatAdjustmentReason(transaction.adjustmentReason)}${
+                                    transaction.adjustmentExplanation
+                                      ? `: ${transaction.adjustmentExplanation}`
+                                      : ''
+                                  }`
+                                : '—'}
+                            </TableCell>
                             <TableCell align="right">{transaction.quantity}</TableCell>
                             <TableCell>{transaction.warehouseName}</TableCell>
                             <TableCell>

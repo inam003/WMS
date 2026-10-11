@@ -28,6 +28,15 @@ public class InventoryTransactionConfiguration : IEntityTypeConfiguration<Invent
         builder.Property(transaction => transaction.IdempotencyKey)
             .IsRequired(false);
 
+        builder.Property(transaction => transaction.AdjustmentReason)
+            .HasConversion<string>()
+            .HasMaxLength(50)
+            .IsRequired(false);
+
+        builder.Property(transaction => transaction.AdjustmentExplanation)
+            .HasMaxLength(500)
+            .IsRequired(false);
+
         builder.Property(transaction => transaction.CreatedBy)
             .IsRequired()
             .HasMaxLength(200);
