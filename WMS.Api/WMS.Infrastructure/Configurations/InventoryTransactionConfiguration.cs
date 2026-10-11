@@ -31,6 +31,15 @@ public class InventoryTransactionConfiguration : IEntityTypeConfiguration<Invent
         builder.Property(transaction => transaction.TransferId)
             .IsRequired(false);
 
+        builder.Property(transaction => transaction.OrderId)
+            .IsRequired(false);
+
+        builder.Property(transaction => transaction.OrderLineId)
+            .IsRequired(false);
+
+        builder.HasIndex(transaction => transaction.OrderId);
+        builder.HasIndex(transaction => transaction.OrderLineId);
+
         builder.Property(transaction => transaction.AdjustmentReason)
             .HasConversion<string>()
             .HasMaxLength(50)
@@ -65,5 +74,17 @@ public class InventoryTransactionConfiguration : IEntityTypeConfiguration<Invent
             .WithMany()
             .HasForeignKey(transaction => transaction.LocationId)
             .IsRequired();
+
+        builder.HasOne<CustomerOrder>()
+            .WithMany()
+            .HasForeignKey(transaction => transaction.OrderId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
+
+        builder.HasOne<CustomerOrderLine>()
+            .WithMany()
+            .HasForeignKey(transaction => transaction.OrderLineId)
+            .OnDelete(DeleteBehavior.Restrict)
+            .IsRequired(false);
     }
 }

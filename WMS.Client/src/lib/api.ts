@@ -101,6 +101,49 @@ export interface InventoryTransaction {
   adjustmentReason: string | null;
   adjustmentExplanation: string | null;
   transferId: string | null;
+  orderId: string | null;
+  orderLineId: string | null;
+}
+
+export type CustomerOrderStatus = 'Draft' | 'Ready' | 'Dispatched' | 'Cancelled';
+
+export interface OrderLineRequest {
+  productId: string;
+  quantity: number;
+}
+
+export interface OrderRequest {
+  customerName: string | null;
+  referenceId: string | null;
+  lines: OrderLineRequest[];
+}
+
+export interface OrderLine {
+  id: string;
+  productId: string;
+  productName: string;
+  sku: string;
+  quantity: number;
+  dispatchLocationId: string | null;
+  dispatchLocationName: string | null;
+  dispatchWarehouseName: string | null;
+}
+
+export interface CustomerOrder {
+  id: string;
+  orderNumber: string;
+  customerName: string | null;
+  referenceId: string | null;
+  status: CustomerOrderStatus;
+  createdBy: string;
+  createdAt: string;
+  dispatchedBy: string | null;
+  dispatchedAt: string | null;
+  lines: OrderLine[];
+}
+
+export interface OrderDispatchRequest {
+  lines: { orderLineId: string; locationId: string }[];
 }
 
 export interface InventoryTransactionFilters {
@@ -530,6 +573,74 @@ export async function transferInventory(
     },
     body: JSON.stringify(request),
   });
+}
+
+export async function getOrders(signal?: AbortSignal): Promise<CustomerOrder[]> {
+  const orders = await authenticatedApiRequest<CustomerOrder[]>('/api/orders', {
+    signal,
+  });
+  if (!Array.isArray(orders)) {
+    throw new ApiError('The API returned an invalid order list.');
+  }
+  return orders;
+}
+
+export function createOrder(request: OrderRequest): Promise<CustomerOrder | null> {
+  return authenticatedApiRequest<CustomerOrder>('/api/orders', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+}
+
+export function updateOrder(
+  id: string,
+  request: OrderRequest,
+): Promise<CustomerOrder | null> {
+  return authenticatedApiRequest<CustomerOrder>(
+    `/api/orders/${encodeURIComponent(id)}`,
+    {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request),
+    },
+  );
+}
+
+export function markOrderReady(id: string): Promise<CustomerOrder | null> {
+  return authenticatedApiRequest<CustomerOrder>(
+    `/api/orders/${encodeURIComponent(id)}/ready`,
+    { method: 'POST' },
+  );
+}
+
+export function cancelOrder(id: string): Promise<CustomerOrder | null> {
+  return authenticatedApiRequest<CustomerOrder>(
+    `/api/orders/${encodeURIComponent(id)}/cancel`,
+    { method: 'POST' },
+  );
+}
+
+export async function dispatchOrder(
+  id: string,
+  request: OrderDispatchRequest,
+  idempotencyKey: string,
+): Promise<InventoryTransaction[]> {
+  const transactions = await authenticatedApiRequest<InventoryTransaction[]>(
+    `/api/orders/${encodeURIComponent(id)}/dispatch`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Idempotency-Key': idempotencyKey,
+      },
+      body: JSON.stringify(request),
+    },
+  );
+  if (!Array.isArray(transactions)) {
+    throw new ApiError('The API returned invalid dispatch transaction history.');
+  }
+  return transactions;
 }
 
 export function getInventoryRecord(id: string): Promise<InventoryRecord | null> {

@@ -21,4 +21,6 @@ public sealed record InventoryTransactionResponse(
     [property: JsonConverter(typeof(JsonStringEnumConverter<InventoryAdjustmentReason>))]
     InventoryAdjustmentReason? AdjustmentReason,
     string? AdjustmentExplanation,
-    Guid? TransferId);
+    Guid? TransferId,
+    Guid? OrderId,
+    Guid? OrderLineId);

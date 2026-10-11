@@ -186,6 +186,11 @@ public sealed class InventoryController(IInventoryService inventoryService) : Co
                 Status = StatusCodes.Status409Conflict,
                 Title = "The inventory movement would reduce stock below zero."
             }),
+            InventoryError.OrderNotReady => Conflict(new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "The order is no longer Ready for dispatch."
+            }),
             InventoryError.NotFound => NotFound(),
             InventoryError.None => throw new InvalidOperationException(
                 "Successful inventory operations should not be mapped to an error response."),

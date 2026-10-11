@@ -1,4 +1,5 @@
 using WMS.Application.InventoryTransactions;
+using WMS.Application.Orders;
 
 namespace WMS.Application.Inventory;
 
@@ -22,5 +23,6 @@ public interface IInventoryRepository
     Task<InventoryMovementPersistenceResult> ApplyInventoryMovementAsync(
         IReadOnlyList<WMS.Domain.InventoryTransaction> transactions,
         IReadOnlyList<InventoryQuantityChange> quantityChanges,
+        OrderDispatchMovement? orderDispatch,
         CancellationToken cancellationToken);
 }

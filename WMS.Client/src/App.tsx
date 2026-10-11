@@ -7,6 +7,7 @@ import { Home } from './pages/home';
 import { Inventory } from './pages/inventory';
 import { InventoryAdjustments } from './pages/inventory-adjustments';
 import { InventoryTransactions } from './pages/inventory-transactions';
+import { Orders } from './pages/orders';
 import { Locations } from './pages/locations';
 import { Products } from './pages/products';
 import { Receiving } from './pages/receiving';
@@ -28,6 +29,7 @@ export default function App() {
         <Route path="/inventory-adjustments" element={<InventoryAdjustments />} />
         <Route path="/receiving" element={<Receiving />} />
         <Route path="/warehouse-transfers" element={<WarehouseTransfers />} />
+        <Route path="/orders" element={<Orders />} />
         <Route
           path="/inventory-transactions"
           element={<InventoryTransactions />}

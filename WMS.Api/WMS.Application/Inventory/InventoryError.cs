@@ -17,5 +17,6 @@ public enum InventoryError
     SourceLocationNotFound,
     DestinationLocationNotFound,
     InactiveSourceLocation,
-    InactiveDestinationLocation
+    InactiveDestinationLocation,
+    OrderNotReady
 }

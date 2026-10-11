@@ -26,6 +26,10 @@ export const queryKeys = {
     all: ['locations'] as const,
     detail: (id: string) => ['locations', 'detail', id] as const,
   },
+  orders: {
+    all: ['orders'] as const,
+    detail: (id: string) => ['orders', 'detail', id] as const,
+  },
 };
 
 interface InventoryQueryFilters {

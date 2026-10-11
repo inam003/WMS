@@ -10,6 +10,8 @@ public class InventoryTransaction
     public Guid? ReferenceId { get; set; }
     public Guid? IdempotencyKey { get; set; }
     public Guid? TransferId { get; set; }
+    public Guid? OrderId { get; set; }
+    public Guid? OrderLineId { get; set; }
     public InventoryAdjustmentReason? AdjustmentReason { get; set; }
     public string? AdjustmentExplanation { get; set; }
     public string CreatedBy { get; set; } = string.Empty;

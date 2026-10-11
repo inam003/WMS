@@ -11,6 +11,8 @@ namespace WMS.Infrastructure.Data
         public DbSet<Location> Locations => Set<Location>();
         public DbSet<Inventory> Inventory => Set<Inventory>();
         public DbSet<InventoryTransaction> InventoryTransactions => Set<InventoryTransaction>();
+        public DbSet<CustomerOrder> Orders => Set<CustomerOrder>();
+        public DbSet<CustomerOrderLine> OrderLines => Set<CustomerOrderLine>();
 
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options) 
         { 

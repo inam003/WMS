@@ -31,6 +31,7 @@ import StorageOutlinedIcon from '@mui/icons-material/StorageOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
 import MoveToInboxOutlinedIcon from '@mui/icons-material/MoveToInboxOutlined';
 import SwapHorizOutlinedIcon from '@mui/icons-material/SwapHorizOutlined';
+import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import {
@@ -63,6 +64,7 @@ const navigation = [
     to: '/warehouse-transfers',
     icon: <SwapHorizOutlinedIcon />,
   },
+  { label: 'Orders', to: '/orders', icon: <ShoppingCartOutlinedIcon /> },
   {
     label: 'Transactions',
     to: '/inventory-transactions',

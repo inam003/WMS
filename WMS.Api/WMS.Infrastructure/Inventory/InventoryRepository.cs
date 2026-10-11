@@ -2,6 +2,7 @@ using Microsoft.EntityFrameworkCore;
 using Npgsql;
 using WMS.Application.Inventory;
 using WMS.Application.InventoryTransactions;
+using WMS.Application.Orders;
 using WMS.Infrastructure.Data;
 
 namespace WMS.Infrastructure.InventoryData;
@@ -43,17 +44,28 @@ public sealed class InventoryRepository(ApplicationDbContext dbContext) : IInven
             return [];
         }
 
-        if (!original.TransferId.HasValue)
+        if (original.TransferId.HasValue)
         {
-            return [original];
+            return await dbContext.InventoryTransactions
+                .AsNoTracking()
+                .Where(transaction => transaction.TransferId == original.TransferId)
+                .OrderBy(transaction => transaction.Type)
+                .Select(ToTransactionResponse)
+                .ToListAsync(cancellationToken);
         }
 
-        return await dbContext.InventoryTransactions
-            .AsNoTracking()
-            .Where(transaction => transaction.TransferId == original.TransferId)
-            .OrderBy(transaction => transaction.Type)
-            .Select(ToTransactionResponse)
-            .ToListAsync(cancellationToken);
+        if (original.OrderId.HasValue)
+        {
+            return await dbContext.InventoryTransactions
+                .AsNoTracking()
+                .Where(transaction => transaction.OrderId == original.OrderId &&
+                    transaction.Type == "Dispatch")
+                .OrderBy(transaction => transaction.OrderLineId)
+                .Select(ToTransactionResponse)
+                .ToListAsync(cancellationToken);
+        }
+
+        return [original];
     }
 
     public async Task<IReadOnlyList<InventoryResponse>> GetAllAsync(
@@ -100,6 +112,7 @@ public sealed class InventoryRepository(ApplicationDbContext dbContext) : IInven
     public async Task<InventoryMovementPersistenceResult> ApplyInventoryMovementAsync(
         IReadOnlyList<WMS.Domain.InventoryTransaction> transactions,
         IReadOnlyList<InventoryQuantityChange> quantityChanges,
+        OrderDispatchMovement? orderDispatch,
         CancellationToken cancellationToken)
     {
         await using var databaseTransaction =
@@ -137,6 +150,14 @@ public sealed class InventoryRepository(ApplicationDbContext dbContext) : IInven
                     .OrderBy(transaction => transaction.Type)
                     .Select(ToTransactionResponse)
                     .ToListAsync(cancellationToken)
+                : existing.OrderId.HasValue
+                    ? await dbContext.InventoryTransactions
+                        .AsNoTracking()
+                        .Where(transaction => transaction.OrderId == existing.OrderId &&
+                            transaction.Type == "Dispatch")
+                        .OrderBy(transaction => transaction.OrderLineId)
+                        .Select(ToTransactionResponse)
+                        .ToListAsync(cancellationToken)
                 : [existing];
             var isReplay = AreSameMovement(transactions, existingTransactions);
 
@@ -149,6 +170,61 @@ public sealed class InventoryRepository(ApplicationDbContext dbContext) : IInven
 
         try
         {
+            if (orderDispatch is not null)
+            {
+                var dispatchedAt = DateTimeOffset.UtcNow;
+                var orderRowsUpdated = await dbContext.Orders
+                    .Where(order =>
+                        order.Id == orderDispatch.OrderId &&
+                        order.Status == WMS.Domain.CustomerOrderStatus.Ready)
+                    .ExecuteUpdateAsync(
+                        updates => updates
+                            .SetProperty(order => order.Status, WMS.Domain.CustomerOrderStatus.Dispatched)
+                            .SetProperty(order => order.DispatchedBy, transactions[0].CreatedBy)
+                            .SetProperty(order => order.DispatchedAt, dispatchedAt)
+                            .SetProperty(
+                                order => order.DispatchIdempotencyKey,
+                                transactions[0].IdempotencyKey),
+                        cancellationToken);
+                if (orderRowsUpdated != 1)
+                {
+                    await databaseTransaction.RollbackAsync(cancellationToken);
+                    foreach (var transaction in transactions)
+                    {
+                        dbContext.Entry(transaction).State = EntityState.Detached;
+                    }
+
+                    return new InventoryMovementPersistenceResult(
+                        InventoryMovementPersistenceStatus.OrderNotReady,
+                        null);
+                }
+
+                foreach (var line in orderDispatch.Lines)
+                {
+                    var lineRowsUpdated = await dbContext.OrderLines
+                        .Where(orderLine =>
+                            orderLine.Id == line.OrderLineId &&
+                            orderLine.OrderId == orderDispatch.OrderId)
+                        .ExecuteUpdateAsync(
+                            updates => updates.SetProperty(
+                                orderLine => orderLine.DispatchLocationId,
+                                line.LocationId),
+                            cancellationToken);
+                    if (lineRowsUpdated != 1)
+                    {
+                        await databaseTransaction.RollbackAsync(cancellationToken);
+                        foreach (var transaction in transactions)
+                        {
+                            dbContext.Entry(transaction).State = EntityState.Detached;
+                        }
+
+                        return new InventoryMovementPersistenceResult(
+                            InventoryMovementPersistenceStatus.OrderNotReady,
+                            null);
+                    }
+                }
+            }
+
             foreach (var change in quantityChanges
                 .OrderBy(change => change.ProductId)
                 .ThenBy(change => change.LocationId))
@@ -247,7 +323,9 @@ public sealed class InventoryRepository(ApplicationDbContext dbContext) : IInven
             transaction.Quantity == candidate.Quantity &&
             transaction.ReferenceId == candidate.ReferenceId &&
             transaction.AdjustmentReason == candidate.AdjustmentReason &&
-            transaction.AdjustmentExplanation == candidate.AdjustmentExplanation));
+            transaction.AdjustmentExplanation == candidate.AdjustmentExplanation &&
+            transaction.OrderId == candidate.OrderId &&
+            transaction.OrderLineId == candidate.OrderLineId));
 
     private static bool IsIdempotencyKeyViolation(DbUpdateException exception) =>
         exception.GetBaseException() is PostgresException
@@ -290,5 +368,7 @@ public sealed class InventoryRepository(ApplicationDbContext dbContext) : IInven
             transaction.CreatedAt,
             transaction.AdjustmentReason,
             transaction.AdjustmentExplanation,
-            transaction.TransferId);
+            transaction.TransferId,
+            transaction.OrderId,
+            transaction.OrderLineId);
 }

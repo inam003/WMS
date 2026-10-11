@@ -1,4 +1,5 @@
 using WMS.Application.InventoryTransactions;
+using WMS.Application.Orders;
 using WMS.Domain;
 
 namespace WMS.Application.Inventory;
@@ -74,14 +75,14 @@ public sealed class InventoryService(IInventoryRepository repository) : IInvento
         CancellationToken cancellationToken) =>
         await ApplyMovementAsync(
             request.ProductId,
-            request.Quantity,
-            [(request.LocationId, ReceiptTransactionType)],
+            [(request.LocationId, ReceiptTransactionType, request.Quantity, (Guid?)null)],
             [new InventoryQuantityChange(request.ProductId, request.LocationId, request.Quantity)],
             request.ReferenceId,
             null,
             null,
             idempotencyKey,
             createdBy,
+            null,
             null,
             cancellationToken);
 
@@ -125,8 +126,7 @@ public sealed class InventoryService(IInventoryRepository repository) : IInvento
         var isIncrease = request.Type == InventoryAdjustmentType.Increase;
         return await ApplyMovementAsync(
             request.ProductId,
-            request.Quantity,
-            [(request.LocationId, isIncrease ? "AdjustmentIncrease" : "AdjustmentDecrease")],
+            [(request.LocationId, isIncrease ? "AdjustmentIncrease" : "AdjustmentDecrease", request.Quantity, (Guid?)null)],
             [
                 new InventoryQuantityChange(
                     request.ProductId,
@@ -138,6 +138,7 @@ public sealed class InventoryService(IInventoryRepository repository) : IInvento
             explanation,
             idempotencyKey,
             createdBy,
+            null,
             null,
             cancellationToken);
     }
@@ -161,10 +162,9 @@ public sealed class InventoryService(IInventoryRepository repository) : IInvento
         var transferId = Guid.NewGuid();
         return await ApplyMovementAsync(
             request.ProductId,
-            request.Quantity,
             [
-                (request.SourceLocationId, "TransferOut"),
-                (request.DestinationLocationId, "TransferIn")
+                (request.SourceLocationId, "TransferOut", request.Quantity, (Guid?)null),
+                (request.DestinationLocationId, "TransferIn", request.Quantity, (Guid?)null)
             ],
             [
                 new InventoryQuantityChange(
@@ -182,13 +182,53 @@ public sealed class InventoryService(IInventoryRepository repository) : IInvento
             idempotencyKey,
             createdBy,
             transferId,
+            null,
+            cancellationToken);
+    }
+
+    public async Task<InventoryOperationResult<InventoryMovementResult>> DispatchOrderAsync(
+        OrderDispatchMovement movement,
+        string? idempotencyKey,
+        string? createdBy,
+        CancellationToken cancellationToken)
+    {
+        if (movement.Lines.Count == 0)
+        {
+            return InventoryOperationResult<InventoryMovementResult>.InvalidRequest(
+                new Dictionary<string, string[]>
+                {
+                    ["Lines"] = ["At least one order line must be dispatched."]
+                });
+        }
+
+        var quantityChanges = movement.Lines
+            .Select(line => new InventoryQuantityChange(
+                line.ProductId,
+                line.LocationId,
+                -line.Quantity))
+            .ToArray();
+
+        return await ApplyMovementAsync(
+            movement.Lines[0].ProductId,
+            movement.Lines.Select(line => (
+                line.LocationId,
+                "Dispatch",
+                line.Quantity,
+                (Guid?)line.OrderLineId)).ToArray(),
+            quantityChanges,
+            movement.ReferenceId,
+            null,
+            null,
+            idempotencyKey,
+            createdBy,
+            null,
+            movement,
             cancellationToken);
     }
 
     private async Task<InventoryOperationResult<InventoryMovementResult>> ApplyMovementAsync(
         Guid productId,
-        decimal quantity,
-        IReadOnlyList<(Guid LocationId, string Type)> movements,
+        IReadOnlyList<(Guid LocationId, string Type, decimal Quantity, Guid? OrderLineId)> movements,
         IReadOnlyList<InventoryQuantityChange> quantityChanges,
         Guid? referenceId,
         InventoryAdjustmentReason? adjustmentReason,
@@ -196,6 +236,7 @@ public sealed class InventoryService(IInventoryRepository repository) : IInvento
         string? idempotencyKey,
         string? createdBy,
         Guid? transferId,
+        OrderDispatchMovement? orderDispatch,
         CancellationToken cancellationToken)
     {
         var validationErrors = new Dictionary<string, string[]>();
@@ -213,9 +254,10 @@ public sealed class InventoryService(IInventoryRepository repository) : IInvento
             }
         }
 
-        if (quantity <= 0 ||
-            quantity > MaximumQuantity ||
-            decimal.Round(quantity, MaximumQuantityPrecision) != quantity)
+        if (movements.Any(movement =>
+            movement.Quantity <= 0 ||
+            movement.Quantity > MaximumQuantity ||
+            decimal.Round(movement.Quantity, MaximumQuantityPrecision) != movement.Quantity))
         {
             validationErrors["Quantity"] =
                 ["Quantity must be greater than zero and support no more than three decimal places."];
@@ -243,11 +285,13 @@ public sealed class InventoryService(IInventoryRepository repository) : IInvento
                 Id = Guid.NewGuid(),
                 ProductId = productId,
                 LocationId = movement.LocationId,
-                Quantity = quantity,
+                Quantity = movement.Quantity,
                 Type = movement.Type,
                 ReferenceId = referenceId,
                 IdempotencyKey = index == 0 ? parsedIdempotencyKey : null,
                 TransferId = transferId,
+                OrderId = orderDispatch?.OrderId,
+                OrderLineId = movement.OrderLineId,
                 AdjustmentReason = adjustmentReason,
                 AdjustmentExplanation = adjustmentExplanation,
                 CreatedBy = createdBy!
@@ -284,6 +328,27 @@ public sealed class InventoryService(IInventoryRepository repository) : IInvento
                 InventoryError.InactiveProduct);
         }
 
+        if (orderDispatch is not null)
+        {
+            foreach (var dispatchProductId in orderDispatch.Lines.Select(line => line.ProductId).Distinct())
+            {
+                var dispatchProductIsActive = await repository.GetProductActiveAsync(
+                    dispatchProductId,
+                    cancellationToken);
+                if (!dispatchProductIsActive.HasValue)
+                {
+                    return InventoryOperationResult<InventoryMovementResult>.Failure(
+                        InventoryError.ProductNotFound);
+                }
+
+                if (!dispatchProductIsActive.Value)
+                {
+                    return InventoryOperationResult<InventoryMovementResult>.Failure(
+                        InventoryError.InactiveProduct);
+                }
+            }
+        }
+
         foreach (var locationId in movements.Select(movement => movement.LocationId).Distinct())
         {
             var locationIsActive = await repository.GetLocationActiveAsync(
@@ -305,6 +370,7 @@ public sealed class InventoryService(IInventoryRepository repository) : IInvento
         var persistenceResult = await repository.ApplyInventoryMovementAsync(
             transactions,
             quantityChanges,
+            orderDispatch,
             cancellationToken);
 
         if (persistenceResult.Status == InventoryMovementPersistenceStatus.IdempotencyConflict)
@@ -323,6 +389,12 @@ public sealed class InventoryService(IInventoryRepository repository) : IInvento
         {
             return InventoryOperationResult<InventoryMovementResult>.Failure(
                 InventoryError.InsufficientInventory);
+        }
+
+        if (persistenceResult.Status == InventoryMovementPersistenceStatus.OrderNotReady)
+        {
+            return InventoryOperationResult<InventoryMovementResult>.Failure(
+                InventoryError.OrderNotReady);
         }
 
         var savedTransactions = persistenceResult.Transactions
@@ -345,7 +417,9 @@ public sealed class InventoryService(IInventoryRepository repository) : IInvento
             existing.Quantity == candidate.Quantity &&
             existing.ReferenceId == candidate.ReferenceId &&
             existing.AdjustmentReason == candidate.AdjustmentReason &&
-            existing.AdjustmentExplanation == candidate.AdjustmentExplanation));
+            existing.AdjustmentExplanation == candidate.AdjustmentExplanation &&
+            existing.OrderId == candidate.OrderId &&
+            existing.OrderLineId == candidate.OrderLineId));
 
     private static Dictionary<string, string[]> ValidateQuery(InventoryQuery query)
     {

@@ -8,7 +8,8 @@ public enum InventoryMovementPersistenceStatus
     Replayed,
     IdempotencyConflict,
     QuantityLimitExceeded,
-    InsufficientInventory
+    InsufficientInventory,
+    OrderNotReady
 }
 
 public sealed record InventoryMovementPersistenceResult(
