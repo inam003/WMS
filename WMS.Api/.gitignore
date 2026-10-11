@@ -22,4 +22,4 @@ Desktop.ini
 
 # User Secrets & Local Configuration files
 *.usersecrets
-WMS.Api/WMS.Api/appsettings.Development.json
+/WMS.Api/appsettings.Development.json
