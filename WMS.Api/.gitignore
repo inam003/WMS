@@ -1,0 +1,24 @@
+# Visual Studio Cache and Settings (Fixes your current error)
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# Compiled Build Outputs (Never push these!)
+[Bb]in/
+[Oo]bj/
+Generated_Files/
+
+# Rider / IntelliJ / VS Code specific caches (if used)
+.idea/
+.vscode/
+
+# Operating System files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+
+# User Secrets & Local Configuration files
+*.usersecrets
