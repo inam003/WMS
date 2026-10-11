@@ -19,6 +19,20 @@ public sealed class LocationService(ILocationRepository repository) : ILocationS
         return location is null ? null : ToResponse(location);
     }
 
+    public async Task<LocationResponse?> GetByBarcodeAsync(
+        string barcode,
+        CancellationToken cancellationToken)
+    {
+        var normalizedBarcode = barcode.Trim();
+        if (normalizedBarcode.Length == 0)
+        {
+            return null;
+        }
+
+        var location = await repository.GetByBarcodeAsync(normalizedBarcode, cancellationToken);
+        return location is null ? null : ToResponse(location);
+    }
+
     public async Task<LocationOperationResult<LocationResponse>> CreateAsync(
         CreateLocationRequest request,
         CancellationToken cancellationToken)
@@ -27,7 +41,8 @@ public sealed class LocationService(ILocationRepository repository) : ILocationS
             request.WarehouseId,
             request.Name,
             request.Code,
-            request.Type);
+            request.Type,
+            request.Barcode);
         if (errors.Count > 0)
         {
             return LocationOperationResult<LocationResponse>.Invalid(errors);
@@ -50,6 +65,14 @@ public sealed class LocationService(ILocationRepository repository) : ILocationS
                 LocationError.DuplicateCode);
         }
 
+        var barcode = NormalizeOptional(request.Barcode);
+        if (barcode is not null &&
+            await repository.BarcodeExistsAsync(barcode, null, cancellationToken))
+        {
+            return LocationOperationResult<LocationResponse>.Failure(
+                LocationError.DuplicateBarcode);
+        }
+
         var location = new Location
         {
             Id = Guid.NewGuid(),
@@ -57,7 +80,8 @@ public sealed class LocationService(ILocationRepository repository) : ILocationS
             Name = request.Name!.Trim(),
             Code = code,
             Type = request.Type!.Trim(),
-            IsActive = request.IsActive
+            IsActive = request.IsActive,
+            Barcode = barcode
         };
 
         var persistenceError = await repository.AddAsync(location, cancellationToken);
@@ -85,7 +109,8 @@ public sealed class LocationService(ILocationRepository repository) : ILocationS
             request.WarehouseId,
             request.Name,
             request.Code,
-            request.Type);
+            request.Type,
+            request.Barcode);
         if (errors.Count > 0)
         {
             return LocationOperationResult<LocationResponse>.Invalid(errors);
@@ -108,11 +133,20 @@ public sealed class LocationService(ILocationRepository repository) : ILocationS
                 LocationError.DuplicateCode);
         }
 
+        var barcode = NormalizeOptional(request.Barcode);
+        if (barcode is not null &&
+            await repository.BarcodeExistsAsync(barcode, id, cancellationToken))
+        {
+            return LocationOperationResult<LocationResponse>.Failure(
+                LocationError.DuplicateBarcode);
+        }
+
         location.WarehouseId = request.WarehouseId;
         location.Name = request.Name!.Trim();
         location.Code = code;
         location.Type = request.Type!.Trim();
         location.IsActive = request.IsActive;
+        location.Barcode = barcode;
 
         var persistenceError = await repository.UpdateAsync(location, cancellationToken);
         if (persistenceError != LocationPersistenceError.None)
@@ -151,7 +185,8 @@ public sealed class LocationService(ILocationRepository repository) : ILocationS
         Guid warehouseId,
         string? name,
         string? code,
-        string? type)
+        string? type,
+        string? barcode)
     {
         var errors = new Dictionary<string, string[]>();
         if (warehouseId == Guid.Empty)
@@ -162,7 +197,26 @@ public sealed class LocationService(ILocationRepository repository) : ILocationS
         AddRequiredStringError(errors, nameof(Location.Name), name, 100);
         AddRequiredStringError(errors, nameof(Location.Code), code, 50);
         AddRequiredStringError(errors, nameof(Location.Type), type, 50);
+        AddOptionalStringError(errors, nameof(Location.Barcode), barcode, 100);
         return errors;
+    }
+
+    private static void AddOptionalStringError(
+        IDictionary<string, string[]> errors,
+        string field,
+        string? value,
+        int maximumLength)
+    {
+        if (value?.Trim().Length > maximumLength)
+        {
+            errors[field] = [$"{field} must be {maximumLength} characters or fewer."];
+        }
+    }
+
+    private static string? NormalizeOptional(string? value)
+    {
+        var normalized = value?.Trim();
+        return string.IsNullOrEmpty(normalized) ? null : normalized;
     }
 
     private static void AddRequiredStringError(
@@ -187,6 +241,7 @@ public sealed class LocationService(ILocationRepository repository) : ILocationS
             LocationPersistenceError.NotFound => LocationError.NotFound,
             LocationPersistenceError.WarehouseNotFound => LocationError.WarehouseNotFound,
             LocationPersistenceError.DuplicateCode => LocationError.DuplicateCode,
+            LocationPersistenceError.DuplicateBarcode => LocationError.DuplicateBarcode,
             LocationPersistenceError.HasDependencies => LocationError.HasDependencies,
             _ => LocationError.None
         };
@@ -198,5 +253,6 @@ public sealed class LocationService(ILocationRepository repository) : ILocationS
             location.Name,
             location.Code,
             location.Type,
-            location.IsActive);
+            location.IsActive,
+            location.Barcode);
 }

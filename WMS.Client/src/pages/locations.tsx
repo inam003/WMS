@@ -34,6 +34,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
 import { DialogTitleWithClose } from '../components/DialogTitleWithClose';
+import { BarcodeLabelButton } from '../components/BarcodeLabelButton';
 import {
   ApiError,
   createLocation,
@@ -44,12 +45,14 @@ import {
 } from '../lib/api';
 import type { Location, LocationRequest } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
+import { generateInternalBarcode } from '../lib/barcode';
 
 interface LocationFormValues {
   warehouseId: string;
   name: string;
   code: string;
   type: string;
+  barcode: string;
   isActive: boolean;
 }
 
@@ -60,6 +63,7 @@ const emptyForm: LocationFormValues = {
   name: '',
   code: '',
   type: '',
+  barcode: '',
   isActive: true,
 };
 
@@ -160,6 +164,7 @@ export function Locations() {
       name: location.name,
       code: location.code,
       type: location.type,
+      barcode: location.barcode ?? '',
       isActive: location.isActive,
     });
     setFormErrors({});
@@ -175,6 +180,7 @@ export function Locations() {
     const name = formValues.name.trim();
     const code = formValues.code.trim();
     const type = formValues.type.trim();
+    const barcode = formValues.barcode.trim();
     if (!formValues.warehouseId) errors.WarehouseId = ['Warehouse is required.'];
     if (!name) errors.Name = ['Name is required.'];
     else if (name.length > 100) errors.Name = ['Name must be 100 characters or fewer.'];
@@ -182,6 +188,7 @@ export function Locations() {
     else if (code.length > 50) errors.Code = ['Code must be 50 characters or fewer.'];
     if (!type) errors.Type = ['Type is required.'];
     else if (type.length > 50) errors.Type = ['Type must be 50 characters or fewer.'];
+    if (barcode.length > 100) errors.Barcode = ['Barcode must be 100 characters or fewer.'];
     if (Object.keys(errors).length > 0) {
       setFormErrors(errors);
       return;
@@ -192,6 +199,7 @@ export function Locations() {
       name,
       code,
       type,
+      barcode: barcode || null,
       isActive: formValues.isActive,
     };
     try {
@@ -337,7 +345,14 @@ export function Locations() {
                       <TableBody>
                         {locations.map((location) => (
                           <TableRow hover key={location.id}>
-                            <TableCell>{location.name}</TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                                {location.name}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                {location.barcode || 'No barcode'}
+                              </Typography>
+                            </TableCell>
                             <TableCell>{location.code}</TableCell>
                             <TableCell>
                               {warehouseNames.get(location.warehouseId) ?? location.warehouseId}
@@ -345,6 +360,11 @@ export function Locations() {
                             <TableCell>{location.type}</TableCell>
                             <TableCell>{location.isActive ? 'Active' : 'Inactive'}</TableCell>
                             <TableCell align="right">
+                              <BarcodeLabelButton
+                                title={location.name}
+                                subtitle={`Location: ${location.code}`}
+                                barcode={location.barcode}
+                              />
                               <Tooltip title="Edit location">
                                 <IconButton
                                   aria-label={`Edit ${location.name}`}
@@ -444,6 +464,31 @@ export function Locations() {
                   error={Boolean(fieldError('Type'))}
                   helperText={fieldError('Type')?.join(' ')}
                 />
+                <TextField
+                  label="Barcode (optional)"
+                  value={formValues.barcode}
+                  onChange={(event) =>
+                    setFormValues((current) => ({ ...current, barcode: event.target.value }))
+                  }
+                  slotProps={{ htmlInput: { maxLength: 100 } }}
+                  error={Boolean(fieldError('Barcode'))}
+                  helperText={
+                    fieldError('Barcode')?.join(' ') ??
+                    'Unique internal Code 128 value. Generated codes are not GS1 registered.'
+                  }
+                />
+                <Button
+                  size="small"
+                  sx={{ alignSelf: 'flex-start' }}
+                  onClick={() =>
+                    setFormValues((current) => ({
+                      ...current,
+                      barcode: generateInternalBarcode('location'),
+                    }))
+                  }
+                >
+                  Generate internal barcode
+                </Button>
                 <FormControlLabel
                   control={
                     <Checkbox

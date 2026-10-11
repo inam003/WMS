@@ -17,6 +17,7 @@ import {
   Typography,
 } from '@mui/material';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
+import { BarcodeScannerButton } from '../components/BarcodeScannerButton';
 import {
   adjustInventory,
   getLocations,
@@ -286,21 +287,29 @@ export function InventoryAdjustments() {
             </Stack>
           ) : (
             <Stack spacing={2.5} sx={{ p: { xs: 2, sm: 3 } }}>
-              <FormControl fullWidth required>
-                <InputLabel id="adjustment-product-label">Product</InputLabel>
-                <Select
-                  labelId="adjustment-product-label"
-                  label="Product"
-                  value={form.productId}
-                  onChange={(event) => updateForm('productId', event.target.value)}
-                >
-                  {products.map((product) => (
-                    <MenuItem key={product.id} value={product.id}>
-                      {product.name} ({product.sku})
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { sm: 'center' } }}>
+                <FormControl fullWidth required>
+                  <InputLabel id="adjustment-product-label">Product</InputLabel>
+                  <Select
+                    labelId="adjustment-product-label"
+                    label="Product"
+                    value={form.productId}
+                    onChange={(event) => updateForm('productId', event.target.value)}
+                  >
+                    {products.map((product) => (
+                      <MenuItem key={product.id} value={product.id}>
+                        {product.name} ({product.sku})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <BarcodeScannerButton
+                  target="product"
+                  onResolved={(entity) => {
+                    if ('sku' in entity) updateForm('productId', entity.id);
+                  }}
+                />
+              </Stack>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <FormControl fullWidth required>
                   <InputLabel id="adjustment-warehouse-label">Warehouse</InputLabel>
@@ -340,6 +349,21 @@ export function InventoryAdjustments() {
                     ))}
                   </Select>
                 </FormControl>
+                <BarcodeScannerButton
+                  target="location"
+                  label="Scan location"
+                  onResolved={(entity) => {
+                    if ('warehouseId' in entity) {
+                      setForm((current) => ({
+                        ...current,
+                        warehouseId: entity.warehouseId,
+                        locationId: entity.id,
+                      }));
+                      setFormError(undefined);
+                      setSuccessMessage(undefined);
+                    }
+                  }}
+                />
               </Stack>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <FormControl fullWidth required>

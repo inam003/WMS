@@ -16,6 +16,7 @@ import {
   Typography,
 } from '@mui/material';
 import MoveToInboxOutlinedIcon from '@mui/icons-material/MoveToInboxOutlined';
+import { BarcodeScannerButton } from '../components/BarcodeScannerButton';
 import {
   getLocations,
   getProducts,
@@ -256,21 +257,29 @@ export function Receiving() {
             </Stack>
           ) : (
             <Stack spacing={2.5} sx={{ p: { xs: 2, sm: 3 } }}>
-              <FormControl fullWidth required>
-                <InputLabel id="receipt-product-label">Product</InputLabel>
-                <Select
-                  labelId="receipt-product-label"
-                  label="Product"
-                  value={form.productId}
-                  onChange={(event) => updateForm('productId', event.target.value)}
-                >
-                  {products.map((product) => (
-                    <MenuItem key={product.id} value={product.id}>
-                      {product.name} ({product.sku})
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { sm: 'center' } }}>
+                <FormControl fullWidth required>
+                  <InputLabel id="receipt-product-label">Product</InputLabel>
+                  <Select
+                    labelId="receipt-product-label"
+                    label="Product"
+                    value={form.productId}
+                    onChange={(event) => updateForm('productId', event.target.value)}
+                  >
+                    {products.map((product) => (
+                      <MenuItem key={product.id} value={product.id}>
+                        {product.name} ({product.sku})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <BarcodeScannerButton
+                  target="product"
+                  onResolved={(entity) => {
+                    if ('sku' in entity) updateForm('productId', entity.id);
+                  }}
+                />
+              </Stack>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <FormControl fullWidth required>
                   <InputLabel id="receipt-warehouse-label">Warehouse</InputLabel>
@@ -312,6 +321,21 @@ export function Receiving() {
                     ))}
                   </Select>
                 </FormControl>
+                <BarcodeScannerButton
+                  target="location"
+                  label="Scan location"
+                  onResolved={(entity) => {
+                    if ('warehouseId' in entity) {
+                      setForm((current) => ({
+                        ...current,
+                        warehouseId: entity.warehouseId,
+                        locationId: entity.id,
+                      }));
+                      setFormError(undefined);
+                      setSuccessMessage(undefined);
+                    }
+                  }}
+                />
               </Stack>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <TextField

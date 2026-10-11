@@ -15,6 +15,17 @@ public sealed class ProductsController(IProductService productService) : Control
         CancellationToken cancellationToken) =>
         Ok(await productService.GetAllAsync(cancellationToken));
 
+    [HttpGet("barcode/{barcode}")]
+    [ProducesResponseType(typeof(ProductResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<ProductResponse>> GetByBarcode(
+        string barcode,
+        CancellationToken cancellationToken)
+    {
+        var product = await productService.GetByBarcodeAsync(barcode, cancellationToken);
+        return product is null ? NotFound() : Ok(product);
+    }
+
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(ProductResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]

@@ -20,6 +20,13 @@ public sealed class ProductRepository(ApplicationDbContext dbContext) : IProduct
             .AsNoTracking()
             .SingleOrDefaultAsync(product => product.Id == id, cancellationToken);
 
+    public Task<Product?> GetByBarcodeAsync(
+        string barcode,
+        CancellationToken cancellationToken) =>
+        dbContext.Products
+            .AsNoTracking()
+            .SingleOrDefaultAsync(product => product.Barcode == barcode, cancellationToken);
+
     public Task<bool> CategoryExistsAsync(Guid categoryId, CancellationToken cancellationToken) =>
         dbContext.Categories.AnyAsync(category => category.Id == categoryId, cancellationToken);
 

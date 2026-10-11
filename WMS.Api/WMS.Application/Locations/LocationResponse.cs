@@ -6,4 +6,5 @@ public sealed record LocationResponse(
     string Name,
     string Code,
     string Type,
-    bool IsActive);
+    bool IsActive,
+    string? Barcode);

@@ -21,6 +21,13 @@ public sealed class LocationRepository(ApplicationDbContext dbContext) : ILocati
             .AsNoTracking()
             .SingleOrDefaultAsync(location => location.Id == id, cancellationToken);
 
+    public Task<Location?> GetByBarcodeAsync(
+        string barcode,
+        CancellationToken cancellationToken) =>
+        dbContext.Locations
+            .AsNoTracking()
+            .SingleOrDefaultAsync(location => location.Barcode == barcode, cancellationToken);
+
     public Task<bool> WarehouseExistsAsync(
         Guid warehouseId,
         CancellationToken cancellationToken) =>
@@ -36,6 +43,16 @@ public sealed class LocationRepository(ApplicationDbContext dbContext) : ILocati
         dbContext.Locations.AnyAsync(
             location => location.WarehouseId == warehouseId &&
                 location.Code == code &&
+                (!excludingLocationId.HasValue ||
+                 location.Id != excludingLocationId.Value),
+            cancellationToken);
+
+    public Task<bool> BarcodeExistsAsync(
+        string barcode,
+        Guid? excludingLocationId,
+        CancellationToken cancellationToken) =>
+        dbContext.Locations.AnyAsync(
+            location => location.Barcode == barcode &&
                 (!excludingLocationId.HasValue ||
                  location.Id != excludingLocationId.Value),
             cancellationToken);
@@ -98,6 +115,10 @@ public sealed class LocationRepository(ApplicationDbContext dbContext) : ILocati
                     SqlState: PostgresErrorCodes.UniqueViolation,
                     ConstraintName: "IX_Locations_WarehouseId_Code"
                 } => LocationPersistenceError.DuplicateCode,
+                {
+                    SqlState: PostgresErrorCodes.UniqueViolation,
+                    ConstraintName: "IX_Locations_Barcode"
+                } => LocationPersistenceError.DuplicateBarcode,
                 {
                     SqlState: PostgresErrorCodes.ForeignKeyViolation,
                     ConstraintName: "FK_Locations_Warehouses_WarehouseId"

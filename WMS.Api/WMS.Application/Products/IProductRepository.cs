@@ -6,6 +6,7 @@ public interface IProductRepository
 {
     Task<IReadOnlyList<Product>> GetAllAsync(CancellationToken cancellationToken);
     Task<Product?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+    Task<Product?> GetByBarcodeAsync(string barcode, CancellationToken cancellationToken);
     Task<bool> CategoryExistsAsync(Guid categoryId, CancellationToken cancellationToken);
     Task<bool> SkuExistsAsync(
         string sku,

@@ -36,6 +36,7 @@ import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import SearchIcon from '@mui/icons-material/Search';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import { DialogTitleWithClose } from '../components/DialogTitleWithClose';
+import { BarcodeLabelButton } from '../components/BarcodeLabelButton';
 import {
   ApiError,
   createProduct,
@@ -47,6 +48,7 @@ import {
 } from '../lib/api';
 import type { Product, ProductRequest } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
+import { generateInternalBarcode } from '../lib/barcode';
 
 interface ProductFormValues {
   sku: string;
@@ -588,6 +590,11 @@ export function Products() {
                                     <DeleteOutlineIcon fontSize="small" />
                                   </IconButton>
                                 </Tooltip>
+                                <BarcodeLabelButton
+                                  title={product.name}
+                                  subtitle={`SKU: ${product.sku}`}
+                                  barcode={product.barcode}
+                                />
                               </Stack>
                             </TableCell>
                           </TableRow>
@@ -831,15 +838,27 @@ export function Products() {
                     }
                   />
                 </Stack>
-                <TextField
-                  fullWidth
-                  label="Barcode"
-                  value={formValues.barcode}
-                  onChange={(event) => updateField('barcode', event.target.value)}
-                  slotProps={{ htmlInput: { maxLength: 100 } }}
-                  error={Boolean(fieldError('Barcode'))}
-                  helperText={fieldError('Barcode')?.join(' ')}
-                />
+                <Stack spacing={0.75}>
+                  <TextField
+                    fullWidth
+                    label="Barcode (optional)"
+                    value={formValues.barcode}
+                    onChange={(event) => updateField('barcode', event.target.value)}
+                    slotProps={{ htmlInput: { maxLength: 100 } }}
+                    error={Boolean(fieldError('Barcode'))}
+                    helperText={
+                      fieldError('Barcode')?.join(' ') ??
+                      'Unique internal Code 128 value. Generated codes are not GS1 registered.'
+                    }
+                  />
+                  <Button
+                    size="small"
+                    sx={{ alignSelf: 'flex-start' }}
+                    onClick={() => updateField('barcode', generateInternalBarcode('product'))}
+                  >
+                    Generate internal barcode
+                  </Button>
+                </Stack>
                 <TextField
                   fullWidth
                   multiline

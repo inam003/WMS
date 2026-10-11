@@ -60,6 +60,7 @@ export interface Location {
   code: string;
   type: string;
   isActive: boolean;
+  barcode: string | null;
 }
 
 export interface LocationRequest {
@@ -68,6 +69,7 @@ export interface LocationRequest {
   code: string;
   type: string;
   isActive: boolean;
+  barcode: string | null;
 }
 
 export interface InventoryRecord {
@@ -367,6 +369,21 @@ export async function getProducts(signal?: AbortSignal): Promise<Product[]> {
   return products;
 }
 
+export async function getProductByBarcode(
+  barcode: string,
+  signal?: AbortSignal,
+): Promise<Product | null> {
+  try {
+    return await authenticatedApiRequest<Product>(
+      `/api/products/barcode/${encodeURIComponent(barcode)}`,
+      { signal },
+    );
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+}
+
 export async function getCategories(signal?: AbortSignal): Promise<Category[]> {
   const categories =
     await authenticatedApiRequest<Category[]>('/api/categories', { signal });
@@ -471,6 +488,21 @@ export async function getLocations(signal?: AbortSignal): Promise<Location[]> {
     throw new ApiError('The API returned an invalid location list.');
   }
   return locations;
+}
+
+export async function getLocationByBarcode(
+  barcode: string,
+  signal?: AbortSignal,
+): Promise<Location | null> {
+  try {
+    return await authenticatedApiRequest<Location>(
+      `/api/locations/barcode/${encodeURIComponent(barcode)}`,
+      { signal },
+    );
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
 }
 
 export function getLocation(

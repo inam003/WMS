@@ -21,6 +21,7 @@ import {
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
+import { BarcodeScannerButton } from '../components/BarcodeScannerButton';
 import {
   cancelOrder,
   createOrder,
@@ -551,6 +552,22 @@ export function Orders() {
                                 ))}
                               </Select>
                             </FormControl>
+                            <BarcodeScannerButton
+                              target="product"
+                              label="Scan"
+                              onResolved={(entity) => {
+                                if ('sku' in entity) {
+                                  setForm((current) => ({
+                                    ...current,
+                                    lines: current.lines.map((item, itemIndex) =>
+                                      itemIndex === index
+                                        ? { ...item, productId: entity.id }
+                                        : item,
+                                    ),
+                                  }));
+                                }
+                              }}
+                            />
                             <TextField
                               required
                               label="Quantity"
@@ -718,6 +735,21 @@ export function Orders() {
                                     ))}
                                   </Select>
                                 </FormControl>
+                                <BarcodeScannerButton
+                                  target="location"
+                                  label="Scan"
+                                  onResolved={(entity) => {
+                                    if ('warehouseId' in entity) {
+                                      setDispatchSelections((current) => ({
+                                        ...current,
+                                        [line.id]: {
+                                          warehouseId: entity.warehouseId,
+                                          locationId: entity.id,
+                                        },
+                                      }));
+                                    }
+                                  }}
+                                />
                               </Stack>
                             );
                           })}

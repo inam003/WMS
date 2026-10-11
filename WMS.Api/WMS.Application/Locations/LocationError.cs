@@ -7,5 +7,6 @@ public enum LocationError
     NotFound,
     WarehouseNotFound,
     DuplicateCode,
+    DuplicateBarcode,
     HasDependencies
 }

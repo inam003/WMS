@@ -23,3 +23,30 @@ body {
 #root {
   min-height: 100vh;
 }
+
+@media print {
+  body * {
+    visibility: hidden !important;
+  }
+
+  #barcode-label-print,
+  #barcode-label-print * {
+    visibility: visible !important;
+  }
+
+  #barcode-label-print {
+    position: fixed !important;
+    inset: 0 auto auto 0 !important;
+    width: 90mm !important;
+    min-height: 45mm !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    padding: 6mm !important;
+    background: white !important;
+    color: black !important;
+  }
+
+  #barcode-label-print .MuiTypography-root {
+    color: black !important;
+  }
+}

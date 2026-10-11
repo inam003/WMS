@@ -16,6 +16,7 @@ import {
   Typography,
 } from '@mui/material';
 import SwapHorizOutlinedIcon from '@mui/icons-material/SwapHorizOutlined';
+import { BarcodeScannerButton } from '../components/BarcodeScannerButton';
 import {
   getLocations,
   getProducts,
@@ -298,21 +299,29 @@ export function WarehouseTransfers() {
             </Stack>
           ) : (
             <Stack spacing={2.5} sx={{ p: { xs: 2, sm: 3 } }}>
-              <FormControl fullWidth required>
-                <InputLabel id="transfer-product-label">Product</InputLabel>
-                <Select
-                  labelId="transfer-product-label"
-                  label="Product"
-                  value={form.productId}
-                  onChange={(event) => updateForm('productId', event.target.value)}
-                >
-                  {products.map((product) => (
-                    <MenuItem key={product.id} value={product.id}>
-                      {product.name} ({product.sku})
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { sm: 'center' } }}>
+                <FormControl fullWidth required>
+                  <InputLabel id="transfer-product-label">Product</InputLabel>
+                  <Select
+                    labelId="transfer-product-label"
+                    label="Product"
+                    value={form.productId}
+                    onChange={(event) => updateForm('productId', event.target.value)}
+                  >
+                    {products.map((product) => (
+                      <MenuItem key={product.id} value={product.id}>
+                        {product.name} ({product.sku})
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
+                <BarcodeScannerButton
+                  target="product"
+                  onResolved={(entity) => {
+                    if ('sku' in entity) updateForm('productId', entity.id);
+                  }}
+                />
+              </Stack>
               <Typography variant="subtitle1" sx={{ fontWeight: 650 }}>
                 Source
               </Typography>
@@ -369,6 +378,21 @@ export function WarehouseTransfers() {
                     ))}
                   </Select>
                 </FormControl>
+                <BarcodeScannerButton
+                  target="location"
+                  label="Scan source"
+                  onResolved={(entity) => {
+                    if ('warehouseId' in entity) {
+                      setForm((current) => ({
+                        ...current,
+                        sourceWarehouseId: entity.warehouseId,
+                        sourceLocationId: entity.id,
+                      }));
+                      setFormError(undefined);
+                      setSuccessMessage(undefined);
+                    }
+                  }}
+                />
               </Stack>
               <Typography variant="subtitle1" sx={{ fontWeight: 650 }}>
                 Destination
@@ -426,6 +450,21 @@ export function WarehouseTransfers() {
                     ))}
                   </Select>
                 </FormControl>
+                <BarcodeScannerButton
+                  target="location"
+                  label="Scan destination"
+                  onResolved={(entity) => {
+                    if ('warehouseId' in entity) {
+                      setForm((current) => ({
+                        ...current,
+                        destinationWarehouseId: entity.warehouseId,
+                        destinationLocationId: entity.id,
+                      }));
+                      setFormError(undefined);
+                      setSuccessMessage(undefined);
+                    }
+                  }}
+                />
               </Stack>
               <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                 <TextField

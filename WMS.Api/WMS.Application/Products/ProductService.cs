@@ -21,6 +21,20 @@ public sealed class ProductService(IProductRepository repository) : IProductServ
         return product is null ? null : ToResponse(product);
     }
 
+    public async Task<ProductResponse?> GetByBarcodeAsync(
+        string barcode,
+        CancellationToken cancellationToken)
+    {
+        var normalizedBarcode = barcode.Trim();
+        if (normalizedBarcode.Length == 0)
+        {
+            return null;
+        }
+
+        var product = await repository.GetByBarcodeAsync(normalizedBarcode, cancellationToken);
+        return product is null ? null : ToResponse(product);
+    }
+
     public async Task<ProductOperationResult<ProductResponse>> CreateAsync(
         CreateProductRequest request,
         CancellationToken cancellationToken)

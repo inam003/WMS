@@ -6,7 +6,12 @@ public interface ILocationRepository
 {
     Task<IReadOnlyList<Location>> GetAllAsync(CancellationToken cancellationToken);
     Task<Location?> GetByIdAsync(Guid id, CancellationToken cancellationToken);
+    Task<Location?> GetByBarcodeAsync(string barcode, CancellationToken cancellationToken);
     Task<bool> WarehouseExistsAsync(Guid warehouseId, CancellationToken cancellationToken);
+    Task<bool> BarcodeExistsAsync(
+        string barcode,
+        Guid? excludingLocationId,
+        CancellationToken cancellationToken);
     Task<bool> CodeExistsAsync(
         Guid warehouseId,
         string code,
@@ -30,5 +35,6 @@ public enum LocationPersistenceError
     NotFound,
     WarehouseNotFound,
     DuplicateCode,
+    DuplicateBarcode,
     HasDependencies
 }

@@ -25,6 +25,13 @@ public class LocationConfiguration : IEntityTypeConfiguration<Location>
             .IsRequired()
             .HasMaxLength(50);
 
+        builder.Property(location => location.Barcode)
+            .HasMaxLength(100);
+
+        builder.HasIndex(location => location.Barcode)
+            .IsUnique()
+            .HasFilter("\"Barcode\" IS NOT NULL");
+
         builder.Property(location => location.IsActive)
             .IsRequired();
 

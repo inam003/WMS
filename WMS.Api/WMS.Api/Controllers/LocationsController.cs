@@ -15,6 +15,17 @@ public sealed class LocationsController(ILocationService locationService) : Cont
         CancellationToken cancellationToken) =>
         Ok(await locationService.GetAllAsync(cancellationToken));
 
+    [HttpGet("barcode/{barcode}")]
+    [ProducesResponseType(typeof(LocationResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(StatusCodes.Status404NotFound)]
+    public async Task<ActionResult<LocationResponse>> GetByBarcode(
+        string barcode,
+        CancellationToken cancellationToken)
+    {
+        var location = await locationService.GetByBarcodeAsync(barcode, cancellationToken);
+        return location is null ? NotFound() : Ok(location);
+    }
+
     [HttpGet("{id:guid}")]
     [ProducesResponseType(typeof(LocationResponse), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -94,6 +105,11 @@ public sealed class LocationsController(ILocationService locationService) : Cont
             {
                 Status = StatusCodes.Status409Conflict,
                 Title = "A location with this code already exists in the selected warehouse."
+            }),
+            LocationError.DuplicateBarcode => Conflict(new ProblemDetails
+            {
+                Status = StatusCodes.Status409Conflict,
+                Title = "A location with this barcode already exists."
             }),
             LocationError.HasDependencies => Conflict(new ProblemDetails
             {
