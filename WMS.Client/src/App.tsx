@@ -8,6 +8,7 @@ import { Inventory } from './pages/inventory';
 import { InventoryTransactions } from './pages/inventory-transactions';
 import { Locations } from './pages/locations';
 import { Products } from './pages/products';
+import { Receiving } from './pages/receiving';
 import { Warehouses } from './pages/warehouses';
 
 export default function App() {
@@ -22,6 +23,7 @@ export default function App() {
         <Route path="/warehouses" element={<Warehouses />} />
         <Route path="/locations" element={<Locations />} />
         <Route path="/inventory" element={<Inventory />} />
+        <Route path="/receiving" element={<Receiving />} />
         <Route
           path="/inventory-transactions"
           element={<InventoryTransactions />}

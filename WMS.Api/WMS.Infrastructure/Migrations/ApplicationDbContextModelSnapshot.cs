@@ -87,6 +87,9 @@ namespace WMS.Infrastructure.Migrations
                         .HasMaxLength(200)
                         .HasColumnType("character varying(200)");
 
+                    b.Property<Guid?>("IdempotencyKey")
+                        .HasColumnType("uuid");
+
                     b.Property<Guid>("LocationId")
                         .HasColumnType("uuid");
 
@@ -110,6 +113,10 @@ namespace WMS.Infrastructure.Migrations
                     b.HasIndex("LocationId");
 
                     b.HasIndex("ProductId");
+
+                    b.HasIndex("CreatedBy", "IdempotencyKey")
+                        .IsUnique()
+                        .HasDatabaseName("IX_InventoryTransactions_CreatedBy_IdempotencyKey");
 
                     b.ToTable("InventoryTransactions", t =>
                         {

@@ -4,6 +4,13 @@ public enum InventoryError
 {
     None,
     InvalidFilter,
+    InvalidRequest,
     FilterNotFound,
-    NotFound
+    NotFound,
+    ProductNotFound,
+    LocationNotFound,
+    InactiveProduct,
+    InactiveLocation,
+    IdempotencyConflict,
+    QuantityLimitExceeded
 }

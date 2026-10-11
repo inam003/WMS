@@ -17,6 +17,10 @@ public sealed record InventoryOperationResult<T>(
         IReadOnlyDictionary<string, string[]> validationErrors) =>
         new(InventoryError.InvalidFilter, ValidationErrors: validationErrors);
 
+    public static InventoryOperationResult<T> InvalidRequest(
+        IReadOnlyDictionary<string, string[]> validationErrors) =>
+        new(InventoryError.InvalidRequest, ValidationErrors: validationErrors);
+
     public static InventoryOperationResult<T> MissingFilters(
         IReadOnlyDictionary<string, string[]> missingFilters) =>
         new(InventoryError.FilterNotFound, ValidationErrors: missingFilters);

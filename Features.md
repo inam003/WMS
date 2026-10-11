@@ -35,6 +35,7 @@
 * Select product + quantity + location
 * Automatically increase inventory
 * Receiving history
+* Single-product receipt entry with idempotent retries
 
 
 **Stock Transfer**
@@ -104,7 +105,6 @@
 * Permission checks
 * Negative-stock prevention
 * Transaction consistency
-
 
 
 

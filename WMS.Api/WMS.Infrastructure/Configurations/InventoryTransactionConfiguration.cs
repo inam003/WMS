@@ -25,9 +25,20 @@ public class InventoryTransactionConfiguration : IEntityTypeConfiguration<Invent
         builder.Property(transaction => transaction.ReferenceId)
             .IsRequired(false);
 
+        builder.Property(transaction => transaction.IdempotencyKey)
+            .IsRequired(false);
+
         builder.Property(transaction => transaction.CreatedBy)
             .IsRequired()
             .HasMaxLength(200);
+
+        builder.HasIndex(transaction => new
+            {
+                transaction.CreatedBy,
+                transaction.IdempotencyKey
+            })
+            .IsUnique()
+            .HasDatabaseName("IX_InventoryTransactions_CreatedBy_IdempotencyKey");
 
         builder.Property(transaction => transaction.CreatedAt)
             .IsRequired()

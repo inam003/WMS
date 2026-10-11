@@ -28,6 +28,7 @@ import WarehouseOutlinedIcon from '@mui/icons-material/WarehouseOutlined';
 import PlaceOutlinedIcon from '@mui/icons-material/PlaceOutlined';
 import StorageOutlinedIcon from '@mui/icons-material/StorageOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
+import MoveToInboxOutlinedIcon from '@mui/icons-material/MoveToInboxOutlined';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import {
@@ -49,6 +50,7 @@ const navigation = [
   { label: 'Warehouses', to: '/warehouses', icon: <WarehouseOutlinedIcon /> },
   { label: 'Locations', to: '/locations', icon: <PlaceOutlinedIcon /> },
   { label: 'Inventory', to: '/inventory', icon: <StorageOutlinedIcon /> },
+  { label: 'Receiving', to: '/receiving', icon: <MoveToInboxOutlinedIcon /> },
   {
     label: 'Transactions',
     to: '/inventory-transactions',

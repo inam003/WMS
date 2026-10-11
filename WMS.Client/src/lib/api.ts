@@ -115,6 +115,13 @@ export interface InventoryFilters {
   warehouseId?: string;
 }
 
+export interface InventoryReceiptRequest {
+  productId: string;
+  locationId: string;
+  quantity: number;
+  referenceId: string | null;
+}
+
 interface ProblemDetails {
   title?: string;
   detail?: string;
@@ -454,6 +461,20 @@ export async function getInventory(
     throw new ApiError('The API returned an invalid inventory list.');
   }
   return inventory;
+}
+
+export async function receiveInventory(
+  request: InventoryReceiptRequest,
+  idempotencyKey: string,
+): Promise<InventoryTransaction | null> {
+  return authenticatedApiRequest<InventoryTransaction>('/api/inventory/receipts', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Idempotency-Key': idempotencyKey,
+    },
+    body: JSON.stringify(request),
+  });
 }
 
 export function getInventoryRecord(id: string): Promise<InventoryRecord | null> {
