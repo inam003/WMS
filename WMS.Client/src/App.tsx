@@ -10,6 +10,7 @@ import { InventoryTransactions } from './pages/inventory-transactions';
 import { Orders } from './pages/orders';
 import { Locations } from './pages/locations';
 import { Products } from './pages/products';
+import { Reports } from './pages/reports';
 import { Receiving } from './pages/receiving';
 import { Warehouses } from './pages/warehouses';
 import { WarehouseTransfers } from './pages/warehouse-transfers';
@@ -30,6 +31,7 @@ export default function App() {
         <Route path="/receiving" element={<Receiving />} />
         <Route path="/warehouse-transfers" element={<WarehouseTransfers />} />
         <Route path="/orders" element={<Orders />} />
+        <Route path="/reports" element={<Reports />} />
         <Route
           path="/inventory-transactions"
           element={<InventoryTransactions />}

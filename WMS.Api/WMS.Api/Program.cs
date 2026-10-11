@@ -5,6 +5,7 @@ using WMS.Application.Inventory;
 using WMS.Application.InventoryTransactions;
 using WMS.Application.Products;
 using WMS.Application.Orders;
+using WMS.Application.Reports;
 using WMS.Infrastructure.Categories;
 using WMS.Infrastructure.Data;
 using WMS.Infrastructure.InventoryData;
@@ -14,6 +15,7 @@ using WMS.Application.Warehouses;
 using WMS.Infrastructure.Locations;
 using WMS.Infrastructure.Products;
 using WMS.Infrastructure.Orders;
+using WMS.Infrastructure.Reports;
 using WMS.Infrastructure.Warehouses;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -36,6 +38,8 @@ builder.Services.AddScoped<IProductService, ProductService>();
 builder.Services.AddScoped<IProductRepository, ProductRepository>();
 builder.Services.AddScoped<IOrderService, OrderService>();
 builder.Services.AddScoped<IOrderRepository, OrderRepository>();
+builder.Services.AddScoped<IReportsService, ReportsService>();
+builder.Services.AddScoped<IReportsRepository, ReportsRepository>();
 
 var neonAuthBaseUrl = builder.Configuration["NEON_AUTH_BASE_URL"]
     ?? builder.Configuration["NeonAuth:BaseUrl"];

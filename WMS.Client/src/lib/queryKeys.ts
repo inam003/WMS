@@ -30,6 +30,9 @@ export const queryKeys = {
     all: ['orders'] as const,
     detail: (id: string) => ['orders', 'detail', id] as const,
   },
+  reports: {
+    page: (kind: string, filters: object) => ['reports', kind, filters] as const,
+  },
 };
 
 interface InventoryQueryFilters {

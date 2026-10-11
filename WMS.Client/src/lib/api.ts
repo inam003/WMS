@@ -157,6 +157,111 @@ export interface InventoryTransactionFilters {
   createdTo?: string;
 }
 
+export type ReportKind =
+  | 'stock'
+  | 'movements'
+  | 'receiving'
+  | 'adjustments'
+  | 'transfers'
+  | 'orders';
+
+export interface ReportFilters {
+  productId?: string;
+  warehouseId?: string;
+  locationId?: string;
+  keyword?: string;
+  transactionType?: string;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  pageSize?: number;
+}
+
+export interface ReportPage<T> {
+  items: T[];
+  page: number;
+  pageSize: number;
+  totalCount: number;
+}
+
+export interface StockReportRow {
+  productId: string;
+  productName: string;
+  sku: string;
+  barcode: string | null;
+  warehouseId: string;
+  warehouseName: string;
+  locationId: string;
+  locationName: string;
+  locationCode: string;
+  quantity: number;
+}
+
+export interface MovementReportRow {
+  transactionId: string;
+  productId: string;
+  productName: string;
+  sku: string;
+  barcode: string | null;
+  type: string;
+  quantity: number;
+  warehouseId: string;
+  warehouseName: string;
+  locationId: string;
+  locationName: string;
+  locationCode: string;
+  referenceId: string | null;
+  createdBy: string;
+  createdAt: string;
+  adjustmentReason: string | number | null;
+  adjustmentExplanation: string | null;
+  transferId: string | null;
+  orderId: string | null;
+}
+
+export interface TransferReportRow {
+  transferId: string;
+  productId: string;
+  productName: string;
+  sku: string;
+  quantity: number;
+  sourceWarehouseId: string;
+  sourceWarehouseName: string;
+  sourceLocationId: string;
+  sourceLocationName: string;
+  sourceLocationCode: string;
+  destinationWarehouseId: string;
+  destinationWarehouseName: string;
+  destinationLocationId: string;
+  destinationLocationName: string;
+  destinationLocationCode: string;
+  referenceId: string | null;
+  createdBy: string;
+  createdAt: string;
+}
+
+export interface OrderReportRow {
+  orderId: string;
+  orderNumber: string;
+  status: string | number;
+  customerName: string | null;
+  referenceId: string | null;
+  productId: string;
+  productName: string;
+  sku: string;
+  requestedQuantity: number;
+  dispatchedQuantity: number;
+  dispatchLocationId: string | null;
+  dispatchLocationName: string | null;
+  dispatchLocationCode: string | null;
+  dispatchWarehouseId: string | null;
+  dispatchWarehouseName: string | null;
+  createdBy: string;
+  createdAt: string;
+  dispatchedBy: string | null;
+  dispatchedAt: string | null;
+}
+
 export interface InventoryFilters {
   productId?: string;
   locationId?: string;
@@ -702,6 +807,31 @@ export async function getInventoryTransactions(
     throw new ApiError('The API returned an invalid inventory transaction list.');
   }
   return transactions;
+}
+
+export async function getReportPage<T>(
+  kind: ReportKind,
+  filters: ReportFilters = {},
+  signal?: AbortSignal,
+): Promise<ReportPage<T>> {
+  const query = new URLSearchParams();
+  if (filters.productId) query.set('productId', filters.productId);
+  if (filters.warehouseId) query.set('warehouseId', filters.warehouseId);
+  if (filters.locationId) query.set('locationId', filters.locationId);
+  if (filters.keyword) query.set('keyword', filters.keyword);
+  if (filters.transactionType) query.set('transactionType', filters.transactionType);
+  if (filters.startDate) query.set('startDate', filters.startDate);
+  if (filters.endDate) query.set('endDate', filters.endDate);
+  query.set('page', String(filters.page ?? 1));
+  query.set('pageSize', String(filters.pageSize ?? 50));
+  const report = await authenticatedApiRequest<ReportPage<T>>(
+    `/api/reports/${kind}?${query.toString()}`,
+    { signal },
+  );
+  if (!report || !Array.isArray(report.items)) {
+    throw new ApiError('The API returned an invalid report page.');
+  }
+  return report;
 }
 
 export function getInventoryTransaction(
