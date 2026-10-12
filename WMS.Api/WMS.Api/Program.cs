@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Resend;
 using WMS.Api.Authentication;
 using WMS.Api.Authorization;
 using WMS.Application.Categories;
@@ -29,6 +30,20 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
+var resendApiToken = builder.Configuration["RESEND_APITOKEN"]
+    ?? Environment.GetEnvironmentVariable("RESEND_APITOKEN");
+if (string.IsNullOrWhiteSpace(resendApiToken))
+{
+    throw new InvalidOperationException(
+        "Configure RESEND_APITOKEN with the Resend API token.");
+}
+
+builder.Services.AddOptions();
+builder.Services.AddHttpClient<ResendClient>();
+builder.Services.Configure<ResendClientOptions>(options =>
+    options.ApiToken = resendApiToken);
+builder.Services.AddTransient<IResend, ResendClient>();
+
 builder.Services.AddDbContext<ApplicationDbContext>(options => options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection")));
 builder.Services.AddScoped<IAuditRepository, AuditRepository>();
 builder.Services.AddScoped<ICurrentAuditActor, CurrentAuditActor>();
@@ -52,6 +67,7 @@ builder.Services.AddScoped<IReportsService, ReportsService>();
 builder.Services.AddScoped<IReportsRepository, ReportsRepository>();
 builder.Services.AddScoped<IWmsUserService, WmsUserService>();
 builder.Services.AddScoped<IWmsUserRepository, WmsUserRepository>();
+builder.Services.AddScoped<IInvitationEmailService, ResendInvitationEmailService>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<WmsRequestUser>();
 builder.Services.AddScoped<IAuthorizationHandler, WmsPermissionHandler>();

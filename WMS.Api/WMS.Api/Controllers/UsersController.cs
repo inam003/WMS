@@ -10,6 +10,7 @@ namespace WMS.Api.Controllers;
 [Authorize]
 public sealed class UsersController(
     IWmsUserService userService,
+    IInvitationEmailService invitationEmailService,
     WmsRequestUser requestUser) : ControllerBase
 {
     [HttpGet("me")]
@@ -42,6 +43,19 @@ public sealed class UsersController(
         return result.Succeeded ? Ok(result.Value) : UserError(result.Error);
     }
 
+    [HttpPost("invite")]
+    [Authorize(Policy = "WmsAdmin")]
+    public async Task<ActionResult<InviteWmsUserResponse>> InviteUser(
+        InviteWmsUserRequest request,
+        CancellationToken cancellationToken)
+    {
+        var result = await invitationEmailService.SendInvitationAsync(
+            request,
+            cancellationToken);
+
+        return result.Succeeded ? Ok(result.Value) : InvitationError(result.Error);
+    }
+
     [HttpPut("{subject}/access")]
     [Authorize(Policy = "WmsAdmin")]
     public async Task<ActionResult<WmsUserResponse>> UpdateAccess(
@@ -56,6 +70,37 @@ public sealed class UsersController(
             cancellationToken);
         return result.Succeeded ? Ok(result.Value) : UserError(result.Error);
     }
+
+    private ActionResult InvitationError(InviteWmsUserError error) =>
+        error switch
+        {
+            InviteWmsUserError.InvalidEmail => BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Provide a valid email address to invite."
+            }),
+            InviteWmsUserError.InvalidRole => BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Select a supported WMS role."
+            }),
+            InviteWmsUserError.FrontendUrlNotConfigured => BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Configure WMS_FRONTEND_URL to build the invitation URL."
+            }),
+            InviteWmsUserError.FromEmailNotConfigured => BadRequest(new ProblemDetails
+            {
+                Status = StatusCodes.Status400BadRequest,
+                Title = "Configure WMS_FROM_EMAIL to send invitation emails."
+            }),
+            InviteWmsUserError.SendFailed => StatusCode(StatusCodes.Status502BadGateway, new ProblemDetails
+            {
+                Status = StatusCodes.Status502BadGateway,
+                Title = "The invitation email could not be sent."
+            }),
+            _ => throw new InvalidOperationException($"Unhandled invitation error: {error}.")
+        };
 
     private ActionResult UserError(WmsUserError error) =>
         error switch
