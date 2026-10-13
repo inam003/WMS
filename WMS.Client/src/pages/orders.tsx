@@ -2,13 +2,19 @@ import { useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Alert,
   Box,
   Button,
   Chip,
   CircularProgress,
   FormControl,
-  Grid,
+  Dialog,
+  DialogContent,
+  Table,
+  TableBody,
+  TableCell,
+  TableContainer,
+  TableHead,
+  TableRow,
   IconButton,
   InputLabel,
   MenuItem,
@@ -18,6 +24,8 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { DialogTitleWithClose } from '../components/DialogTitleWithClose';
+import { ToastAlert as Alert } from '../components/ToastProvider';
 import AddOutlinedIcon from '@mui/icons-material/AddOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import ShoppingCartOutlinedIcon from '@mui/icons-material/ShoppingCartOutlined';
@@ -148,7 +156,17 @@ export function Orders() {
     queryFn: ({ signal }) => getInventory({}, signal),
   });
 
-  const orders = ordersQuery.data ?? [];
+  const orders = useMemo(
+    () =>
+      (ordersQuery.data ?? []).map((order) => ({
+        ...order,
+        status:
+          typeof order.status === 'number'
+            ? (['Draft', 'Ready', 'Dispatched', 'Cancelled'] as const)[order.status]
+            : order.status,
+      })),
+    [ordersQuery.data],
+  );
   const products = useMemo(
     () => (productsQuery.data ?? []).filter((product) => product.isActive),
     [productsQuery.data],
@@ -171,8 +189,15 @@ export function Orders() {
   const selectedOrder = orders.find((order) => order.id === selectedOrderId);
   const [form, setForm] = useState<OrderFormValues>(emptyForm);
   const [editing, setEditing] = useState(false);
+  const [detailOpen, setDetailOpen] = useState(false);
   const [formError, setFormError] = useState<string>();
   const [message, setMessage] = useState<string>();
+  let orderValidationError: string | undefined;
+  try {
+    toOrderRequest(form);
+  } catch (error) {
+    orderValidationError = errorMessage(error);
+  }
   const [dispatchSelections, setDispatchSelections] = useState<
     Record<string, DispatchSelection>
   >({});
@@ -270,6 +295,7 @@ export function Orders() {
     inventoryQuery.isPending;
 
   const beginCreate = () => {
+    setDetailOpen(false);
     setSelectedOrderId('');
     setEditing(true);
     setForm(emptyForm);
@@ -278,6 +304,7 @@ export function Orders() {
   };
 
   const beginEdit = (order: CustomerOrder) => {
+    setDetailOpen(false);
     setSelectedOrderId(order.id);
     setEditing(true);
     setForm({
@@ -308,6 +335,7 @@ export function Orders() {
   };
 
   const selectOrder = (order: CustomerOrder) => {
+    setDetailOpen(true);
     setSelectedOrderId(order.id);
     setEditing(false);
     setMessage(undefined);
@@ -372,10 +400,23 @@ export function Orders() {
           record.quantity >= quantity,
       ),
     );
+  const isDispatchFormValid = selectedOrder
+    ? selectedOrder.lines.every((line) => {
+      const selection = dispatchSelections[line.id];
+      return Boolean(
+        selection?.locationId &&
+          stockLocationsForLine(line.productId, line.quantity).some(
+            (location) =>
+              location.id === selection.locationId &&
+              location.warehouseId === selection.warehouseId,
+          ),
+      );
+    })
+    : false;
 
   return (
     <Box component="main" sx={{ py: { xs: 3, md: 5 } }}>
-      <Box sx={{ maxWidth: 1280, mx: 'auto', px: { xs: 2, sm: 3 } }}>
+      <Box sx={{ maxWidth: 1320, mx: 'auto', px: { xs: 2, sm: 3 } }}>
         <Stack
           direction="row"
           spacing={1.5}
@@ -442,67 +483,90 @@ export function Orders() {
             <Typography color="text.secondary">Loading orders and dispatch options…</Typography>
           </Stack>
         ) : (
-          <Grid container spacing={2.5}>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <Paper variant="outlined" sx={{ p: 2 }}>
-                <Typography variant="h6" sx={{ mb: 1.5, fontWeight: 700 }}>
+          <>
+            <Paper variant="outlined">
+              <Box sx={{ px: 2.5, pt: 2.5, pb: 1 }}>
+                <Typography variant="h6" sx={{ fontWeight: 700 }}>
                   Order history
                 </Typography>
-                {orders.length === 0 ? (
-                  <Typography color="text.secondary">No orders have been created.</Typography>
-                ) : (
-                  <Stack spacing={1}>
-                    {orders.map((order) => (
-                      <Button
-                        key={order.id}
-                        onClick={() => selectOrder(order)}
-                        variant={selectedOrderId === order.id ? 'contained' : 'text'}
-                        color={selectedOrderId === order.id ? 'primary' : 'inherit'}
-                        sx={{
-                          justifyContent: 'space-between',
-                          textAlign: 'left',
-                          py: 1.25,
-                          px: 1.5,
-                          textTransform: 'none',
-                        }}
-                      >
-                        <Box sx={{ minWidth: 0, textAlign: 'left' }}>
-                          <Typography variant="body2" sx={{ fontWeight: 700 }} noWrap>
-                            {order.orderNumber}
-                          </Typography>
-                          <Typography variant="caption" sx={{ opacity: 0.75 }}>
-                            {order.customerName || 'No customer'} · {order.lines.length} line(s)
-                          </Typography>
-                        </Box>
-                        <Chip
-                          size="small"
-                          label={order.status}
-                          color={
-                            order.status === 'Dispatched'
-                              ? 'success'
-                              : order.status === 'Ready'
-                                ? 'warning'
-                                : order.status === 'Cancelled'
-                                  ? 'default'
-                                  : 'info'
-                          }
-                          variant={selectedOrderId === order.id ? 'filled' : 'outlined'}
-                        />
-                      </Button>
-                    ))}
-                  </Stack>
-                )}
-              </Paper>
-            </Grid>
-            <Grid size={{ xs: 12, md: 8 }}>
-              {(editing || selectedOrder) && (
-                <Paper variant="outlined" sx={{ p: { xs: 2, sm: 3 } }}>
-                  {editing ? (
+                <Typography variant="body2" color="text.secondary">
+                  {orders.length} {orders.length === 1 ? 'order' : 'orders'}
+                </Typography>
+              </Box>
+              {orders.length === 0 ? (
+                <Typography color="text.secondary" sx={{ px: 2.5, pb: 2.5 }}>
+                  No orders have been created.
+                </Typography>
+              ) : (
+                <TableContainer>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell>Order</TableCell>
+                        <TableCell>Customer</TableCell>
+                        <TableCell>Lines</TableCell>
+                        <TableCell>Status</TableCell>
+                        <TableCell>Created</TableCell>
+                        <TableCell align="right">Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {orders.map((order) => (
+                        <TableRow key={order.id} hover>
+                          <TableCell sx={{ fontWeight: 700 }}>{order.orderNumber}</TableCell>
+                          <TableCell>{order.customerName || 'No customer'}</TableCell>
+                          <TableCell>{order.lines.length}</TableCell>
+                          <TableCell>
+                            <Chip
+                              size="small"
+                              label={order.status}
+                              color={
+                                order.status === 'Dispatched'
+                                  ? 'success'
+                                  : order.status === 'Ready'
+                                    ? 'warning'
+                                    : order.status === 'Cancelled'
+                                      ? 'default'
+                                      : 'info'
+                              }
+                            />
+                          </TableCell>
+                          <TableCell>{formatDate(order.createdAt)}</TableCell>
+                          <TableCell align="right">
+                            <Button size="small" onClick={() => selectOrder(order)}>
+                              View
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </TableContainer>
+              )}
+            </Paper>
+            <Dialog
+              open={editing}
+              onClose={() => !saveMutation.isPending && setEditing(false)}
+              fullWidth
+              maxWidth="md"
+            >
+              <DialogTitleWithClose
+                onClose={() => setEditing(false)}
+                disabled={saveMutation.isPending}
+              >
+                {selectedOrder ? `Edit ${selectedOrder.orderNumber}` : 'Create order'}
+              </DialogTitleWithClose>
+              <DialogContent>
                     <Box component="form" onSubmit={submitOrder}>
                       <Stack spacing={2.5}>
                         <Typography variant="h6" sx={{ fontWeight: 700 }}>
                           {selectedOrder ? `Edit ${selectedOrder.orderNumber}` : 'Create order'}
                         </Typography>
+                        {orderValidationError && (
+                          <Typography color="text.secondary" variant="body2" role="status">
+                            {orderValidationError}
+                          </Typography>
+                        )}
                         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
                           <TextField
                             fullWidth
@@ -588,6 +652,24 @@ export function Orders() {
                                 }))
                               }
                               slotProps={{ htmlInput: { min: 0.001, step: 0.001 } }}
+                              error={
+                                !line.quantity ||
+                                !Number.isFinite(Number(line.quantity)) ||
+                                Number(line.quantity) <= 0 ||
+                                Number(line.quantity) >= 1_000_000_000_000_000 ||
+                                Math.round(Number(line.quantity) * 1000) / 1000 !==
+                                  Number(line.quantity)
+                              }
+                              helperText={
+                                !line.quantity ||
+                                !Number.isFinite(Number(line.quantity)) ||
+                                Number(line.quantity) <= 0 ||
+                                Number(line.quantity) >= 1_000_000_000_000_000 ||
+                                Math.round(Number(line.quantity) * 1000) / 1000 !==
+                                  Number(line.quantity)
+                                  ? 'Enter a positive quantity with up to three decimals.'
+                                  : ' '
+                              }
                               sx={{ minWidth: { sm: 150 } }}
                             />
                             <IconButton
@@ -618,7 +700,11 @@ export function Orders() {
                           </Button>
                         </Stack>
                         <Stack direction="row" spacing={1.5}>
-                          <Button type="submit" variant="contained" disabled={saveMutation.isPending}>
+                          <Button
+                            type="submit"
+                            variant="contained"
+                            disabled={saveMutation.isPending || Boolean(orderValidationError)}
+                          >
                             {saveMutation.isPending ? 'Saving…' : 'Save draft'}
                           </Button>
                           <Button
@@ -632,7 +718,19 @@ export function Orders() {
                         </Stack>
                       </Stack>
                     </Box>
-                  ) : selectedOrder ? (
+              </DialogContent>
+            </Dialog>
+            <Dialog
+              open={detailOpen && Boolean(selectedOrder) && !editing}
+              onClose={() => setDetailOpen(false)}
+              fullWidth
+              maxWidth="md"
+            >
+              <DialogTitleWithClose onClose={() => setDetailOpen(false)}>
+                Order details
+              </DialogTitleWithClose>
+              <DialogContent>
+                {selectedOrder && (
                     <Stack spacing={2.5}>
                       <Stack
                         direction={{ xs: 'column', sm: 'row' }}
@@ -760,11 +858,16 @@ export function Orders() {
                           <Button
                             variant="contained"
                             onClick={submitDispatch}
-                            disabled={dispatchMutation.isPending}
+                            disabled={!isDispatchFormValid || dispatchMutation.isPending}
                             sx={{ alignSelf: 'flex-start' }}
                           >
                             {dispatchMutation.isPending ? 'Dispatching…' : 'Dispatch order'}
                           </Button>
+                          {!isDispatchFormValid && (
+                            <Typography color="text.secondary" variant="body2" role="status">
+                              Choose a source location with sufficient inventory for every line.
+                            </Typography>
+                          )}
                         </Stack>
                       )}
                       <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap' }}>
@@ -799,11 +902,10 @@ export function Orders() {
                         )}
                       </Stack>
                     </Stack>
-                  ) : null}
-                </Paper>
-              )}
-            </Grid>
-          </Grid>
+                )}
+              </DialogContent>
+            </Dialog>
+          </>
         )}
       </Box>
     </Box>

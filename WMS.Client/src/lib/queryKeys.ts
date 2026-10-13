@@ -36,6 +36,7 @@ export const queryKeys = {
   wmsUsers: {
     current: ['wms-user', 'current'] as const,
     all: ['wms-users'] as const,
+    invitations: ['wms-user-invitations'] as const,
   },
   audit: {
     page: (filters: object) => ['audit', 'page', filters] as const,

@@ -6,7 +6,8 @@ import { BrowserRouter } from 'react-router-dom';
 import { QueryClientProvider } from '@tanstack/react-query';
 import App from './App';
 import { AuthQueryCacheLifecycle } from './components/AuthQueryCacheLifecycle';
-import { ThemeModeProvider } from './components/ThemeModeProvider';
+import { ToastProvider } from './components/ToastProvider';
+import { AppThemeProvider } from './components/AppThemeProvider';
 import { neon } from './lib/neon';
 import { queryClient } from './lib/queryClient';
 import favicon from './assets/logo-close.png';
@@ -21,9 +22,10 @@ createRoot(document.getElementById('root')!).render(
       <QueryClientProvider client={queryClient}>
         <AuthQueryCacheLifecycle>
           <BrowserRouter>
-            <ThemeModeProvider>
+            <AppThemeProvider>
               <App />
-            </ThemeModeProvider>
+              <ToastProvider />
+            </AppThemeProvider>
           </BrowserRouter>
         </AuthQueryCacheLifecycle>
       </QueryClientProvider>

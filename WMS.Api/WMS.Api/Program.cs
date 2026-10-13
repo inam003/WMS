@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.AspNetCore.RateLimiting;
 using Resend;
+using System.Threading.RateLimiting;
 using WMS.Api.Authentication;
 using WMS.Api.Authorization;
 using WMS.Application.Categories;
@@ -30,14 +32,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 
-var resendApiToken = builder.Configuration["RESEND_APITOKEN"]
-    ?? Environment.GetEnvironmentVariable("RESEND_APITOKEN");
-if (string.IsNullOrWhiteSpace(resendApiToken))
-{
-    throw new InvalidOperationException(
-        "Configure RESEND_APITOKEN with the Resend API token.");
-}
-
+var resendApiToken = builder.Configuration["RESEND_APITOKEN"] ?? string.Empty;
 builder.Services.AddOptions();
 builder.Services.AddHttpClient<ResendClient>();
 builder.Services.Configure<ResendClientOptions>(options =>
@@ -68,9 +63,50 @@ builder.Services.AddScoped<IReportsRepository, ReportsRepository>();
 builder.Services.AddScoped<IWmsUserService, WmsUserService>();
 builder.Services.AddScoped<IWmsUserRepository, WmsUserRepository>();
 builder.Services.AddScoped<IInvitationEmailService, ResendInvitationEmailService>();
+builder.Services.AddScoped<IWmsInvitationService, WmsInvitationService>();
+builder.Services.AddScoped<IWmsInvitationRepository, WmsInvitationRepository>();
 builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<WmsRequestUser>();
 builder.Services.AddScoped<IAuthorizationHandler, WmsPermissionHandler>();
+builder.Services.AddSingleton<IAuthorizationMiddlewareResultHandler,
+    WmsAuthorizationMiddlewareResultHandler>();
+
+builder.Services.AddRateLimiter(options =>
+{
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+    options.AddPolicy("invitation-validation", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 30,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+    options.AddPolicy("invitation-acceptance", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+    options.AddPolicy("invitation-management", context =>
+        RateLimitPartition.GetFixedWindowLimiter(
+            context.User.FindFirst("sub")?.Value ??
+                context.Connection.RemoteIpAddress?.ToString() ??
+                "unknown",
+            _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = 10,
+                Window = TimeSpan.FromMinutes(1),
+                QueueLimit = 0,
+                AutoReplenishment = true
+            }));
+});
 
 var neonAuthBaseUrl = builder.Configuration["NEON_AUTH_BASE_URL"]
     ?? builder.Configuration["NeonAuth:BaseUrl"];
@@ -101,6 +137,8 @@ builder.Services
         NeonJwtAuthenticationHandler>("Neon", _ => { });
 builder.Services.AddAuthorization(options =>
 {
+    options.AddPolicy("NeonAuthenticated", policy =>
+        policy.RequireAuthenticatedUser());
     options.DefaultPolicy = new Microsoft.AspNetCore.Authorization.AuthorizationPolicyBuilder()
         .RequireAuthenticatedUser()
         .AddRequirements(new WmsPermissionRequirement())
@@ -152,8 +190,10 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseHttpsRedirection();
+app.UseRouting();
 app.UseCors("Frontend");
 app.UseAuthentication();
+app.UseRateLimiter();
 app.UseAuthorization();
 
 app.MapControllers();

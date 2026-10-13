@@ -2,29 +2,25 @@ import { useState } from 'react';
 import { AccountView } from '@neondatabase/neon-js/auth/react/ui';
 import {
   Box,
-  FormControlLabel,
   Paper,
   Stack,
-  Switch,
   Tab,
   Tabs,
   Typography,
 } from '@mui/material';
 import { useParams } from 'react-router-dom';
-import { useThemeMode } from '../lib/themeMode';
 
-type AccountTab = 'account' | 'security' | 'preferences';
+type AccountTab = 'account' | 'security';
 
 export function Account() {
   const { pathname } = useParams();
   const [activeTab, setActiveTab] = useState<AccountTab>(() =>
     pathname === 'security' ? 'security' : 'account',
   );
-  const { mode, toggleMode } = useThemeMode();
 
   return (
     <Box component="main" sx={{ py: { xs: 3, md: 5 } }}>
-      <Box sx={{ maxWidth: 1100, mx: 'auto', px: { xs: 2, sm: 3 } }}>
+      <Box sx={{ maxWidth: 1320, mx: 'auto', px: { xs: 2, sm: 3 } }}>
         <Stack spacing={0.5} sx={{ mb: 3 }}>
           <Typography
             variant="overline"
@@ -37,7 +33,7 @@ export function Account() {
             Account settings
           </Typography>
           <Typography color="text.secondary">
-            Manage your profile, security, and account preferences.
+            Manage your profile, and security.
           </Typography>
         </Stack>
 
@@ -58,51 +54,10 @@ export function Account() {
           >
             <Tab value="account" label="Account" />
             <Tab value="security" label="Security" />
-            <Tab value="preferences" label="Preferences" />
           </Tabs>
 
           <Box sx={{ p: { xs: 2, sm: 3 } }}>
-            {activeTab === 'preferences' ? (
-              <Paper
-                variant="outlined"
-                sx={{
-                  p: { xs: 2, sm: 3 },
-                  borderRadius: 2,
-                  bgcolor: 'background.paper',
-                }}
-              >
-                <Stack
-                  direction={{ xs: 'column', sm: 'row' }}
-                  spacing={2}
-                  sx={{
-                    alignItems: { sm: 'center' },
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                      Appearance
-                    </Typography>
-                    <Typography color="text.secondary">
-                      Choose the theme used throughout the application.
-                    </Typography>
-                  </Box>
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={mode === 'dark'}
-                        onChange={toggleMode}
-                        slotProps={{
-                          input: { 'aria-label': 'Enable dark theme' },
-                        }}
-                      />
-                    }
-                    label={mode === 'dark' ? 'Dark mode' : 'Light mode'}
-                  />
-                </Stack>
-              </Paper>
-            ) : (
-              <Box
+            <Box
                 sx={(theme) => ({
                   '--background': theme.palette.background.default,
                   '--foreground': theme.palette.text.primary,
@@ -182,8 +137,7 @@ export function Account() {
                     },
                   }}
                 />
-              </Box>
-            )}
+            </Box>
           </Box>
         </Paper>
       </Box>

@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Alert,
   Box,
   Button,
   Chip,
@@ -29,12 +28,13 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { ToastAlert as Alert } from '../components/ToastProvider';
+import { showToast } from '../lib/toast';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import SearchIcon from '@mui/icons-material/Search';
-import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import { DialogTitleWithClose } from '../components/DialogTitleWithClose';
 import { BarcodeLabelButton } from '../components/BarcodeLabelButton';
 import {
@@ -42,7 +42,6 @@ import {
   createProduct,
   deleteProduct,
   getCategories,
-  getProduct,
   getProducts,
   updateProduct,
 } from '../lib/api';
@@ -138,28 +137,6 @@ export function Products() {
   const [formValues, setFormValues] = useState<ProductFormValues>(emptyForm);
   const [formErrors, setFormErrors] = useState<Record<string, string[]>>({});
   const [deletingProduct, setDeletingProduct] = useState<Product>();
-  const [detailsProduct, setDetailsProduct] = useState<Product>();
-  const {
-    data: details,
-    isPending: detailsQueryPending,
-    isError: detailsLoadFailed,
-    error: detailsError,
-    refetch: refetchDetails,
-  } = useQuery({
-    queryKey: queryKeys.products.detail(detailsProduct?.id ?? ''),
-    queryFn: async ({ signal }) => {
-      if (!detailsProduct) {
-        throw new Error('A product must be selected to load its details.');
-      }
-      const result = await getProduct(detailsProduct.id, signal);
-      if (!result) {
-        throw new Error('The API returned no product details.');
-      }
-      return result;
-    },
-    enabled: Boolean(detailsProduct),
-  });
-  const detailsLoading = Boolean(detailsProduct) && detailsQueryPending;
   const invalidateProductData = () =>
     Promise.all([
       queryClient.invalidateQueries({ queryKey: queryKeys.products.list }),
@@ -178,7 +155,10 @@ export function Products() {
       }
       return created;
     },
-    onSuccess: invalidateProductData,
+    onSuccess: async () => {
+      await invalidateProductData();
+      showToast('Product created successfully.', 'success');
+    },
   });
   const updateMutation = useMutation({
     mutationFn: async ({
@@ -201,6 +181,7 @@ export function Products() {
           queryKey: queryKeys.products.detail(variables.id),
         }),
       ]);
+      showToast('Product updated successfully.', 'success');
     },
   });
   const deleteMutation = useMutation({
@@ -214,6 +195,7 @@ export function Products() {
           refetchType: 'none',
         }),
       ]);
+      showToast('Product deleted successfully.', 'success');
     },
   });
   const isSaving = createMutation.isPending || updateMutation.isPending;
@@ -313,10 +295,6 @@ export function Products() {
     }
   };
 
-  const showDetails = (product: Product) => {
-    setDetailsProduct(product);
-  };
-
   const removeProduct = async () => {
     if (!deletingProduct) {
       return;
@@ -325,9 +303,6 @@ export function Products() {
     setActionError(undefined);
     try {
       await deleteMutation.mutateAsync(deletingProduct.id);
-      if (detailsProduct?.id === deletingProduct.id) {
-        setDetailsProduct(undefined);
-      }
       setDeletingProduct(undefined);
     } catch (error) {
       setActionError(errorMessage(error));
@@ -516,7 +491,7 @@ export function Products() {
                         <TableRow>
                           <TableCell>Product</TableCell>
                           <TableCell>SKU</TableCell>
-                          <TableCell>Category ID</TableCell>
+                          <TableCell>Category</TableCell>
                           <TableCell>Minimum stock</TableCell>
                           <TableCell>Status</TableCell>
                           <TableCell align="right">Actions</TableCell>
@@ -553,7 +528,12 @@ export function Products() {
                               </Tooltip>
                             </TableCell>
                             <TableCell>
-                              {product.minimumStockLevel} {product.unit}
+                              <Typography variant="body2">
+                                {product.minimumStockLevel}
+                              </Typography>
+                              <Typography variant="caption" color="text.secondary">
+                                Unit: {product.unit}
+                              </Typography>
                             </TableCell>
                             <TableCell>
                               <Chip
@@ -567,15 +547,6 @@ export function Products() {
                                 direction="row"
                                 sx={{ gap: 0.5, justifyContent: 'flex-end' }}
                               >
-                                <Tooltip title="View details">
-                                  <IconButton
-                                    aria-label={`View ${product.name}`}
-                                    onClick={() => void showDetails(product)}
-                                    size="small"
-                                  >
-                                    <VisibilityOutlinedIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
                                 <Tooltip title="Edit product">
                                   <IconButton
                                     aria-label={`Edit ${product.name}`}
@@ -612,90 +583,6 @@ export function Products() {
                 )}
               </Paper>
 
-              {detailsProduct &&
-                (detailsLoading || detailsLoadFailed || details) && (
-                <Paper variant="outlined" sx={{ mt: 2.5, p: 2.5 }}>
-                  {detailsLoading ? (
-                    <Stack
-                      direction="row"
-                      spacing={1.5}
-                      sx={{ alignItems: 'center' }}
-                    >
-                      <CircularProgress size={20} />
-                      <Typography>Loading product details…</Typography>
-                    </Stack>
-                  ) : detailsLoadFailed ? (
-                    <Stack spacing={1.5}>
-                      <Alert severity="error">
-                        {errorMessage(detailsError)}
-                      </Alert>
-                      <Button
-                        variant="outlined"
-                        onClick={() => void refetchDetails()}
-                        sx={{ alignSelf: 'flex-start' }}
-                      >
-                        Retry
-                      </Button>
-                    </Stack>
-                  ) : details ? (
-                    <Stack spacing={2}>
-                      <Stack
-                        direction="row"
-                        sx={{
-                          justifyContent: 'space-between',
-                          alignItems: 'center',
-                        }}
-                      >
-                        <Box>
-                          <Typography variant="overline" color="primary">
-                            PRODUCT DETAILS
-                          </Typography>
-                          <Typography variant="h6" sx={{ fontWeight: 650 }}>
-                            {details.name}
-                          </Typography>
-                        </Box>
-                        <Button onClick={() => setDetailsProduct(undefined)}>
-                          Close
-                        </Button>
-                      </Stack>
-                      <Box
-                        sx={{
-                          display: 'grid',
-                          gridTemplateColumns: {
-                            xs: '1fr',
-                            sm: 'repeat(2, minmax(0, 1fr))',
-                            md: 'repeat(3, minmax(0, 1fr))',
-                          },
-                          gap: 2,
-                        }}
-                      >
-                        <Detail label="SKU" value={details.sku} />
-                        <Detail
-                          label="Category"
-                          value={
-                            categoryNames.get(details.categoryId) ??
-                            details.categoryId
-                          }
-                        />
-                        <Detail label="Unit" value={details.unit} />
-                        <Detail
-                          label="Minimum stock"
-                          value={String(details.minimumStockLevel)}
-                        />
-                        <Detail label="Barcode" value={details.barcode || '—'} />
-                        <Detail
-                          label="Status"
-                          value={details.isActive ? 'Active' : 'Inactive'}
-                        />
-                        <Detail
-                          label="Description"
-                          value={details.description || '—'}
-                        />
-                      </Box>
-                    </Stack>
-                  ) : null}
-                </Paper>
-              )}
       </Box>
 
         <Dialog
@@ -959,23 +846,6 @@ export function Products() {
             </Button>
           </DialogActions>
         </Dialog>
-    </Box>
-  );
-}
-
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <Box>
-      <Typography
-        variant="caption"
-        color="text.secondary"
-        sx={{ display: 'block' }}
-      >
-        {label}
-      </Typography>
-      <Typography variant="body2" sx={{ overflowWrap: 'anywhere' }}>
-        {value}
-      </Typography>
     </Box>
   );
 }

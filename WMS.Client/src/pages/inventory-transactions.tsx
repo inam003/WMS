@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import dayjs from 'dayjs';
 import {
-  Alert,
   Box,
   Button,
   CircularProgress,
@@ -21,6 +20,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { ToastAlert as Alert } from '../components/ToastProvider';
 import { DateTimePicker } from '@mui/x-date-pickers/DateTimePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 import { AdapterDayjs } from '@mui/x-date-pickers/AdapterDayjs';
@@ -181,7 +181,7 @@ export function InventoryTransactions() {
 
   return (
     <Box component="main" sx={{ py: { xs: 3, md: 5 } }}>
-      <Box sx={{ maxWidth: 1440, mx: 'auto', px: { xs: 2, sm: 3 } }}>
+      <Box sx={{ maxWidth: 1320, mx: 'auto', px: { xs: 2, sm: 3 } }}>
               <Box sx={{ mb: 3 }}>
                 <Typography
                   variant="overline"

@@ -7,7 +7,9 @@ public sealed record WmsUserResponse(
     string Role,
     bool IsActive,
     DateTimeOffset CreatedAt,
-    DateTimeOffset UpdatedAt);
+    DateTimeOffset UpdatedAt,
+    DateTimeOffset? AccessProvisionedAt,
+    string? Email = null);
 
 public sealed record CurrentWmsUserResponse(
     string Subject,
@@ -23,7 +25,8 @@ public enum WmsUserError
     NotFound,
     InvalidRole,
     SelfManagementNotAllowed,
-    LastActiveAdmin
+    LastActiveAdmin,
+    AccessActive
 }
 
 public sealed record WmsUserResult<T>(WmsUserError Error, T? Value = default)
@@ -35,12 +38,15 @@ public sealed record WmsUserResult<T>(WmsUserError Error, T? Value = default)
 
 public interface IWmsUserRepository
 {
-    Task<WmsUserAssignment> GetOrCreateAsync(string subject, CancellationToken cancellationToken);
+    Task<WmsUserAssignment?> GetBySubjectAsync(string subject, CancellationToken cancellationToken);
     Task<IReadOnlyList<WmsUserAssignment>> GetAllAsync(CancellationToken cancellationToken);
     Task<WmsUserUpdateResult> UpdateAsync(
         string subject,
         WmsRole? role,
         bool? isActive,
+        CancellationToken cancellationToken);
+    Task<WmsUserRemovalResult> RemoveIfInactiveAsync(
+        string subject,
         CancellationToken cancellationToken);
 }
 
@@ -48,9 +54,16 @@ public sealed record WmsUserUpdateResult(
     WmsUserAssignment? User,
     bool IsLastActiveAdmin = false);
 
+public enum WmsUserRemovalResult
+{
+    Removed,
+    NotFound,
+    AccessActive
+}
+
 public interface IWmsUserService
 {
-    Task<WmsUserAssignment> GetOrCreateAsync(
+    Task<WmsUserAssignment?> GetBySubjectAsync(
         string subject,
         CancellationToken cancellationToken);
     Task<IReadOnlyList<WmsUserResponse>> GetAllAsync(CancellationToken cancellationToken);
@@ -63,5 +76,9 @@ public interface IWmsUserService
         string subject,
         string actorSubject,
         bool isActive,
+        CancellationToken cancellationToken);
+    Task<WmsUserResult<bool>> RemoveAsync(
+        string subject,
+        string actorSubject,
         CancellationToken cancellationToken);
 }

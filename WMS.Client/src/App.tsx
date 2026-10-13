@@ -1,4 +1,5 @@
-import { Alert, Box, Button } from '@mui/material';
+import { Box, Button } from '@mui/material';
+import { ToastAlert as Alert } from './components/ToastProvider';
 import { Link as RouterLink, Route, Routes } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { Account } from './pages/account';
@@ -18,6 +19,8 @@ import { Warehouses } from './pages/warehouses';
 import { WarehouseTransfers } from './pages/warehouse-transfers';
 import { Users } from './pages/users';
 import { AuditHistory } from './pages/audit-history';
+import { AcceptInvitation } from './pages/accept-invitation';
+import { Welcome } from './pages/welcome';
 import { useWmsAccess } from './hooks/useWmsAccess';
 import type { WmsRole } from './lib/api';
 
@@ -78,6 +81,8 @@ export default function App() {
         />
       </Route>
       <Route path="/auth/:pathname" element={<Auth />} />
+      <Route path="/accept-invitation" element={<AcceptInvitation />} />
+      <Route path="/welcome" element={<Welcome />} />
     </Routes>
   );
 }

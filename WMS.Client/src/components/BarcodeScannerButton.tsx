@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import {
-  Alert,
   Box,
   Button,
   CircularProgress,
@@ -12,6 +11,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { ToastAlert as Alert } from './ToastProvider';
 import QrCodeScannerOutlinedIcon from '@mui/icons-material/QrCodeScannerOutlined';
 import {
   getLocationByBarcode,

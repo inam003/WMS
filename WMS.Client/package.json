@@ -14,6 +14,7 @@
     "@emotion/styled": "^11.14.1",
     "@mui/icons-material": "^9.5.0",
     "@mui/material": "^9.5.0",
+    "@mui/x-charts": "^9.15.0",
     "@mui/x-date-pickers": "^9.15.0",
     "@neondatabase/neon-js": "^0.7.0-beta",
     "@tanstack/react-query": "^5.104.1",

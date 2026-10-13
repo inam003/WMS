@@ -19,6 +19,7 @@ namespace WMS.Infrastructure.Data
         public DbSet<CustomerOrder> Orders => Set<CustomerOrder>();
         public DbSet<CustomerOrderLine> OrderLines => Set<CustomerOrderLine>();
         public DbSet<WmsUserAssignment> WmsUserAssignments => Set<WmsUserAssignment>();
+        public DbSet<WmsInvitation> WmsInvitations => Set<WmsInvitation>();
         public DbSet<AuditRecord> AuditRecords => Set<AuditRecord>();
 
         public ApplicationDbContext(
@@ -71,7 +72,7 @@ namespace WMS.Infrastructure.Data
                 .Where(entry =>
                     entry.State is EntityState.Added or EntityState.Modified or EntityState.Deleted)
                 .Where(entry => entry.Entity is Category or Product or Warehouse or Location or
-                    CustomerOrder or CustomerOrderLine or InventoryTransaction or WmsUserAssignment)
+                    CustomerOrder or CustomerOrderLine or InventoryTransaction or WmsUserAssignment or WmsInvitation)
                 .ToArray();
             if (entries.Length == 0)
             {
@@ -79,6 +80,12 @@ namespace WMS.Infrastructure.Data
             }
 
             var actor = currentAuditActor.Subject;
+            if (string.IsNullOrWhiteSpace(actor) &&
+                entries.All(entry => entry.Entity is WmsInvitation))
+            {
+                actor = "system:invitation-claim";
+            }
+
             if (string.IsNullOrWhiteSpace(actor))
             {
                 throw new InvalidOperationException(
@@ -160,6 +167,11 @@ namespace WMS.Infrastructure.Data
                         "User.RoleChanged",
                     WmsUserAssignment when entry.State == EntityState.Modified =>
                         "User.AccessChanged",
+                    WmsInvitation invitation when entry.State == EntityState.Added =>
+                        "Invitation.Created",
+                    WmsInvitation invitation when entry.State == EntityState.Modified &&
+                        entry.Property(nameof(WmsInvitation.Status)).IsModified =>
+                        $"Invitation.{invitation.Status}",
                     _ => $"{entityName}.{entry.State switch
                     {
                         EntityState.Added => "Created",
@@ -218,12 +230,14 @@ namespace WMS.Infrastructure.Data
         {
             CustomerOrderLine => "OrderLine",
             WmsUserAssignment => "User",
+            WmsInvitation => "Invitation",
             _ => entity.GetType().Name
         };
 
         private static string GetEntityId(EntityEntry entry) => entry.Entity switch
         {
             WmsUserAssignment user => user.Subject,
+            WmsInvitation invitation => invitation.Id.ToString(),
             CustomerOrderLine line => line.Id.ToString(),
             _ => Convert.ToString(
                 entry.Property("Id").CurrentValue,
@@ -235,6 +249,8 @@ namespace WMS.Infrastructure.Data
             bool useOriginalValues) =>
             entry.Properties
                 .Where(property => !property.Metadata.IsShadowProperty())
+                .Where(property => entry.Entity is not WmsInvitation ||
+                    property.Metadata.Name != nameof(WmsInvitation.TokenHash))
                 .ToDictionary(
                     property => property.Metadata.Name,
                     property => useOriginalValues

@@ -4,39 +4,24 @@ namespace WMS.Application.Users;
 
 public sealed record InviteWmsUserRequest(
     string Email,
-    string Role,
-    DateTimeOffset ExpiresAtUtc = default);
+    string Role);
 
-public sealed record InviteWmsUserResponse(
+public sealed record InvitationEmailRequest(
     string Email,
-    string Role,
-    string AcceptUrl,
-    DateTimeOffset ExpiresAtUtc);
+    WmsRole Role,
+    string Token,
+    DateTimeOffset ExpiresAt);
 
-public enum InviteWmsUserError
+public enum InvitationEmailError
 {
     None,
-    InvalidEmail,
-    InvalidRole,
-    FrontendUrlNotConfigured,
-    FromEmailNotConfigured,
+    ConfigurationError,
     SendFailed
-}
-
-public sealed record InviteWmsUserResult<T>(InviteWmsUserError Error, T? Value = default)
-{
-    public bool Succeeded => Error == InviteWmsUserError.None;
-
-    public static InviteWmsUserResult<T> Success(T value) =>
-        new(InviteWmsUserError.None, value);
-
-    public static InviteWmsUserResult<T> Failure(InviteWmsUserError error) =>
-        new(error);
 }
 
 public interface IInvitationEmailService
 {
-    Task<InviteWmsUserResult<InviteWmsUserResponse>> SendInvitationAsync(
-        InviteWmsUserRequest request,
+    Task<InvitationEmailError> SendInvitationAsync(
+        InvitationEmailRequest request,
         CancellationToken cancellationToken = default);
 }

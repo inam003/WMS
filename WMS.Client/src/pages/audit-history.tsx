@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Alert,
   Box,
   Button,
   CircularProgress,
@@ -21,6 +20,8 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { ToastAlert as Alert } from '../components/ToastProvider';
+import { DateFilterField } from '../components/DateFilterField';
 import VisibilityOutlinedIcon from '@mui/icons-material/VisibilityOutlined';
 import {
   getAuditHistory,
@@ -93,7 +94,8 @@ export function AuditHistory() {
   };
 
   return (
-    <Box sx={{ p: { xs: 2, md: 3 }, maxWidth: 1440, mx: 'auto' }}>
+    <Box component="main" sx={{ py: { xs: 3, md: 5 } }}>
+      <Box sx={{ maxWidth: 1320, mx: 'auto', px: { xs: 2, sm: 3 } }}>
       <Stack spacing={2.5}>
         <Box>
           <Typography variant="h4" sx={{ fontWeight: 700 }}>
@@ -113,25 +115,19 @@ export function AuditHistory() {
               gap: 1.5,
             }}
           >
-            <TextField
+            <DateFilterField
               label="From"
-              type="date"
-              size="small"
               value={startDate}
-              onChange={(event) =>
-                handleFilterChange(() => setStartDate(event.target.value))
+              onChange={(value) =>
+                handleFilterChange(() => setStartDate(value))
               }
-              slotProps={{ inputLabel: { shrink: true } }}
             />
-            <TextField
+            <DateFilterField
               label="To"
-              type="date"
-              size="small"
               value={endDate}
-              onChange={(event) =>
-                handleFilterChange(() => setEndDate(event.target.value))
+              onChange={(value) =>
+                handleFilterChange(() => setEndDate(value))
               }
-              slotProps={{ inputLabel: { shrink: true } }}
             />
             <TextField
               label="User subject"
@@ -235,6 +231,7 @@ export function AuditHistory() {
           </Paper>
         )}
       </Stack>
+      </Box>
 
       <Dialog
         open={Boolean(selected)}

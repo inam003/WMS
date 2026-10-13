@@ -2,7 +2,6 @@ import { useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Alert,
   Box,
   Button,
   CircularProgress,
@@ -15,6 +14,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { ToastAlert as Alert } from '../components/ToastProvider';
 import SwapHorizOutlinedIcon from '@mui/icons-material/SwapHorizOutlined';
 import { BarcodeScannerButton } from '../components/BarcodeScannerButton';
 import {
@@ -131,6 +131,32 @@ export function WarehouseTransfers() {
       warehousesQuery.refetch(),
       locationsQuery.refetch(),
     ]);
+  const quantity = Number(form.quantity);
+  const isQuantityValid =
+    form.quantity.trim().length > 0 &&
+    Number.isFinite(quantity) &&
+    quantity > 0 &&
+    quantity < 1_000_000_000_000_000 &&
+    Math.round(quantity * 1000) / 1000 === quantity;
+  const isReferenceValid =
+    !form.referenceId.trim() || isGuid(form.referenceId.trim());
+  const isTransferFormValid =
+    !isLoading &&
+    !optionsError &&
+    Boolean(form.productId && form.sourceLocationId && form.destinationLocationId) &&
+    form.sourceLocationId !== form.destinationLocationId &&
+    isQuantityValid &&
+    isReferenceValid;
+  const transferValidationMessage =
+    !form.productId || !form.sourceLocationId || !form.destinationLocationId
+      ? 'Select a product, source location, and destination location.'
+      : form.sourceLocationId === form.destinationLocationId
+        ? 'Source and destination locations must be different.'
+        : !isQuantityValid
+          ? 'Enter a quantity greater than zero with up to three decimals.'
+          : !isReferenceValid
+            ? 'Reference ID must be a valid GUID.'
+            : undefined;
 
   const transferMutation = useMutation({
     mutationFn: async ({
@@ -235,7 +261,7 @@ export function WarehouseTransfers() {
 
   return (
     <Box component="main" sx={{ py: { xs: 3, md: 5 } }}>
-      <Box sx={{ maxWidth: 1100, mx: 'auto', px: { xs: 2, sm: 3 } }}>
+      <Box sx={{ maxWidth: 1320, mx: 'auto', px: { xs: 2, sm: 3 } }}>
         <Stack direction="row" spacing={1.5} sx={{ mb: 3, alignItems: 'center' }}>
           <SwapHorizOutlinedIcon color="primary" fontSize="large" />
           <Box>
@@ -484,16 +510,20 @@ export function WarehouseTransfers() {
                     updateForm('referenceId', event.target.value)
                   }
                   helperText="Optional external transfer reference (GUID)."
+                  error={!isReferenceValid}
                 />
               </Stack>
+              {transferValidationMessage && (
+                <Typography color="text.secondary" variant="body2" role="status">
+                  {transferValidationMessage}
+                </Typography>
+              )}
               <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
                 <Button
                   type="submit"
                   variant="contained"
                   disabled={
-                    isLoading ||
-                    Boolean(optionsError) ||
-                    transferMutation.isPending
+                    !isTransferFormValid || transferMutation.isPending
                   }
                 >
                   {transferMutation.isPending

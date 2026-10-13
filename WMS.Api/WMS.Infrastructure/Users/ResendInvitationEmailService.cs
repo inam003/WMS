@@ -1,124 +1,117 @@
 using System.Net.Mail;
-using System.Security.Cryptography;
+using System.Text.Encodings.Web;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Logging;
 using Resend;
 using WMS.Application.Users;
-using WMS.Domain;
 
 namespace WMS.Infrastructure.Users;
 
 public sealed class ResendInvitationEmailService(
     IResend resend,
-    IConfiguration configuration) : IInvitationEmailService
+    IConfiguration configuration,
+    ILogger<ResendInvitationEmailService> logger) : IInvitationEmailService
 {
     private const string ApplicationName = "WMS";
 
-    public async Task<InviteWmsUserResult<InviteWmsUserResponse>> SendInvitationAsync(
-        InviteWmsUserRequest request,
+    public async Task<InvitationEmailError> SendInvitationAsync(
+        InvitationEmailRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (string.IsNullOrWhiteSpace(request.Email) ||
-            !MailAddress.TryCreate(request.Email, out _))
+        if (string.IsNullOrWhiteSpace(configuration["RESEND_APITOKEN"]) ||
+            !TryGetFrontendBaseUrl(out var frontendBaseUrl) ||
+            !MailAddress.TryCreate(configuration["WMS_FROM_EMAIL"], out var fromAddress))
         {
-            return InviteWmsUserResult<InviteWmsUserResponse>.Failure(
-                InviteWmsUserError.InvalidEmail);
+            return InvitationEmailError.ConfigurationError;
         }
 
-        if (!Enum.TryParse<WmsRole>(request.Role, true, out var role))
-        {
-            return InviteWmsUserResult<InviteWmsUserResponse>.Failure(
-                InviteWmsUserError.InvalidRole);
-        }
-
-        var frontendBaseUrl = GetFrontendBaseUrl();
-        if (string.IsNullOrWhiteSpace(frontendBaseUrl))
-        {
-            return InviteWmsUserResult<InviteWmsUserResponse>.Failure(
-                InviteWmsUserError.FrontendUrlNotConfigured);
-        }
-
-        var fromAddress = configuration["WMS_FROM_EMAIL"] ??
-            Environment.GetEnvironmentVariable("WMS_FROM_EMAIL");
-        if (string.IsNullOrWhiteSpace(fromAddress))
-        {
-            return InviteWmsUserResult<InviteWmsUserResponse>.Failure(
-                InviteWmsUserError.FromEmailNotConfigured);
-        }
-
-        var expiresAt = request.ExpiresAtUtc == default
-            ? DateTimeOffset.UtcNow.AddDays(7)
-            : request.ExpiresAtUtc;
-
-        var token = Convert.ToBase64String(RandomNumberGenerator.GetBytes(32))
-            .TrimEnd('=')
-            .Replace('+', '-')
-            .Replace('/', '_');
-
-        var acceptUrl = BuildAcceptUrl(frontendBaseUrl, token, request.Email, role, expiresAt);
-
+        var acceptUrl = BuildAcceptUrl(frontendBaseUrl!, request.Token);
         var message = new EmailMessage
         {
-            From = fromAddress,
-            Subject = $"{ApplicationName} Invitation: {request.Email}",
-            HtmlBody = BuildHtmlBody(request.Email, role, acceptUrl, expiresAt, frontendBaseUrl)
+            From = fromAddress.ToString(),
+            Subject = $"{ApplicationName} Invitation",
+            HtmlBody = BuildHtmlBody(
+                request.Email,
+                request.Role.ToString(),
+                acceptUrl,
+                request.ExpiresAt)
         };
-
         message.To.Add(request.Email);
 
         try
         {
             await resend.EmailSendAsync(message, cancellationToken);
-            return InviteWmsUserResult<InviteWmsUserResponse>.Success(
-                new InviteWmsUserResponse(request.Email, role.ToString(), acceptUrl, expiresAt));
+            return InvitationEmailError.None;
         }
-        catch (Exception)
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
         {
-            return InviteWmsUserResult<InviteWmsUserResponse>.Failure(
-                InviteWmsUserError.SendFailed);
+            throw;
+        }
+        catch (Exception exception) when (
+            exception is ResendException or HttpRequestException or OperationCanceledException)
+        {
+            logger.LogWarning(
+                "Resend could not deliver a WMS invitation; failureType={FailureType}, reason={Reason}, statusCode={StatusCode}",
+                exception.GetType().Name,
+                exception.Message,
+                (exception as ResendException)?.StatusCode ??
+                    (exception as HttpRequestException)?.StatusCode);
+            return InvitationEmailError.SendFailed;
         }
     }
 
-    private static string BuildAcceptUrl(
-        string frontendBaseUrl,
-        string token,
-        string email,
-        WmsRole role,
-        DateTimeOffset expiresAt)
+    private bool TryGetFrontendBaseUrl(out Uri? frontendBaseUrl)
     {
-        var normalizedBaseUrl = frontendBaseUrl.TrimEnd('/');
-        return $"{normalizedBaseUrl}/accept-invitation?token={Uri.EscapeDataString(token)}&email={Uri.EscapeDataString(email)}&role={Uri.EscapeDataString(role.ToString())}&expiresAt={Uri.EscapeDataString(expiresAt.ToString("O"))}";
+        frontendBaseUrl = null;
+        var configuredUrl = configuration["WMS_FRONTEND_URL"];
+        if (!Uri.TryCreate(configuredUrl, UriKind.Absolute, out var parsedUrl) ||
+            !string.IsNullOrEmpty(parsedUrl.Query) ||
+            !string.IsNullOrEmpty(parsedUrl.Fragment) ||
+            !string.IsNullOrEmpty(parsedUrl.UserInfo))
+        {
+            return false;
+        }
+
+        frontendBaseUrl = parsedUrl;
+        return parsedUrl.Scheme == Uri.UriSchemeHttps ||
+               (string.Equals(
+                    configuration["ASPNETCORE_ENVIRONMENT"],
+                    "Development",
+                    StringComparison.OrdinalIgnoreCase) &&
+                parsedUrl.Scheme == Uri.UriSchemeHttp &&
+                parsedUrl.IsLoopback);
     }
+
+    private static string BuildAcceptUrl(Uri frontendBaseUrl, string token) =>
+        $"{frontendBaseUrl.ToString().TrimEnd('/')}/accept-invitation#token={Uri.EscapeDataString(token)}";
 
     private static string BuildHtmlBody(
         string email,
-        WmsRole role,
+        string role,
         string acceptUrl,
-        DateTimeOffset expiresAt,
-        string frontendBaseUrl) =>
-        $"""
-        <html>
-          <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #111827;">
-            <div style="max-width: 640px; margin: 0 auto; padding: 24px;">
-              <h2 style="margin-bottom: 16px;">{ApplicationName} Invitation</h2>
-              <p>Hello,</p>
-              <p>You have been invited to join <strong>{ApplicationName}</strong> as <strong>{role}</strong>.</p>
-              <p><strong>Invited email:</strong> {email}</p>
-              <p><strong>Invitation expires:</strong> {expiresAt:yyyy-MM-dd HH:mm 'UTC'}</p>
-              <p>
-                <a href="{acceptUrl}" style="display:inline-block; background:#2563eb; color:#ffffff; padding:12px 20px; text-decoration:none; border-radius:6px;">
-                  Accept Invitation
-                </a>
-              </p>
-              <p>Need to sign in? Visit the <a href="{frontendBaseUrl.TrimEnd('/')}/login">WMS login page</a>.</p>
-            </div>
-          </body>
-        </html>
-        """;
+        DateTimeOffset expiresAt)
+    {
+        var safeEmail = HtmlEncoder.Default.Encode(email);
+        var safeRole = HtmlEncoder.Default.Encode(role);
+        var safeAcceptUrl = HtmlEncoder.Default.Encode(acceptUrl);
+        var safeDate = HtmlEncoder.Default.Encode(
+            expiresAt.ToString("yyyy-MM-dd HH:mm"));
 
-    private string? GetFrontendBaseUrl() =>
-        configuration["WMS_FRONTEND_URL"]
-        ?? configuration["WMS_FRONTEND_BASE_URL"]
-        ?? Environment.GetEnvironmentVariable("WMS_FRONTEND_URL")
-        ?? Environment.GetEnvironmentVariable("WMS_FRONTEND_BASE_URL")
-        ?? "http://localhost:5173";
+        return $"""
+            <!doctype html>
+            <html lang="en">
+              <body style="font-family:Arial,sans-serif;line-height:1.6;color:#111827;background:#f9fafb;padding:24px">
+                <main style="max-width:600px;margin:auto;background:#fff;border:1px solid #e5e7eb;border-radius:8px;padding:32px">
+                  <h1 style="font-size:24px">You are invited to {ApplicationName}</h1>
+                  <p>A WMS Admin invited you to join the WMS as <strong>{safeRole}</strong>.</p>
+                  <p><strong>Invited email:</strong> {safeEmail}</p>
+                  <p><strong>Expires:</strong> {safeDate} UTC</p>
+                  <p><a href="{safeAcceptUrl}" style="display:inline-block;background:#2563eb;color:#fff;padding:12px 24px;border-radius:6px;text-decoration:none">Accept Invitation</a></p>
+                  <p>This invitation is intended only for {safeEmail}. Open the link above to accept it, then create your WMS account using this email address and verify it to activate your access.</p>
+                  <p>If you did not expect this invitation, ignore this email.</p>
+                </main>
+              </body>
+            </html>
+            """;
+    }
 }

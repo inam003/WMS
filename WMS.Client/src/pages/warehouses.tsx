@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Alert,
   Box,
   Button,
   Checkbox,
@@ -24,6 +23,8 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { ToastAlert as Alert } from '../components/ToastProvider';
+import { showToast } from '../lib/toast';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
@@ -95,7 +96,10 @@ export function Warehouses() {
       }
       return warehouse;
     },
-    onSuccess: invalidateWarehouseData,
+    onSuccess: async () => {
+      await invalidateWarehouseData();
+      showToast('Warehouse created successfully.', 'success');
+    },
   });
   const updateMutation = useMutation({
     mutationFn: async ({
@@ -111,11 +115,17 @@ export function Warehouses() {
       }
       return warehouse;
     },
-    onSuccess: invalidateWarehouseData,
+    onSuccess: async () => {
+      await invalidateWarehouseData();
+      showToast('Warehouse updated successfully.', 'success');
+    },
   });
   const deleteMutation = useMutation({
     mutationFn: deleteWarehouse,
-    onSuccess: invalidateWarehouseData,
+    onSuccess: async () => {
+      await invalidateWarehouseData();
+      showToast('Warehouse deleted successfully.', 'success');
+    },
   });
   const isSaving = createMutation.isPending || updateMutation.isPending;
   const isDeleting = deleteMutation.isPending;

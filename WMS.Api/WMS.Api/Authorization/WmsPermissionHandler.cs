@@ -13,7 +13,7 @@ public sealed class WmsPermissionHandler(WmsRequestUser requestUser)
             context.Resource is HttpContext httpContext
                 ? httpContext.RequestAborted
                 : CancellationToken.None);
-        if (user.IsActive &&
+        if (user is { IsActive: true, AccessProvisionedAt: not null } &&
             (requirement.AllowedRoles.Count == 0 ||
              requirement.AllowedRoles.Contains(user.Role)))
         {

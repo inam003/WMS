@@ -19,6 +19,50 @@ If the browser reports a certificate error for the local HTTPS API, trust the AS
 
 Neon Auth JWTs expire after 15 minutes; the client requests a fresh token each time the API action is used.
 
+## Invitation-based WMS access
+
+Neon Auth sign-in alone does not grant WMS access. An Admin sends invitations from
+**Users & access**. The recipient opens the email link to accept the invitation,
+then creates an account with that same email address. WMS access is provisioned
+after Neon Auth signs the account in with a verified email. The API uses the
+signed JWT `sub`, `email`, and `email_verified: true` claims for provisioning;
+an email address supplied by the browser is never used to grant access.
+
+Configure these values in the API environment:
+
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `RESEND_APITOKEN` | Yes for invitations | Resend API token; keep it in a secret store and never in client configuration. |
+| `WMS_FROM_EMAIL` | Yes for invitations | Sender address belonging to a verified Resend domain. |
+| `WMS_FRONTEND_URL` | Yes for invitations | Trusted absolute frontend URL used to build accept links. HTTPS is required except for loopback URLs in Development. |
+| `WMS_INVITATION_EXPIRY_DAYS` | No | Invitation lifetime from 1 to 90 days; defaults to 7. |
+
+Resend requires a verified sending domain for production. Do not use
+`onboarding@resend.dev` as a production sender; configure `WMS_FROM_EMAIL` with
+an address on a domain verified in Resend.
+
+The `AddInvitationBasedWmsAccess` EF Core migration creates invitation storage
+and backfills `AccessProvisionedAt` only for existing Admin assignments. This
+explicitly preserves the current Admin access without grandfathering Viewer or
+other legacy first-seen assignments that may have been created automatically.
+Existing non-Admin role assignments remain in the database, but have no WMS
+access until an Admin invites them and the invitation is accepted by opening its
+email link; the matching verified account receives the invitation's role when it
+signs in. The API does not apply migrations
+at startup. Review and apply migrations using the project's existing EF Core
+deployment workflow before deploying this version.
+
+Admin invitation routes are `GET/POST /api/users/invitations`,
+`POST /api/users/invitations/{id}/resend`, and
+`POST /api/users/invitations/{id}/revoke`. Public invitation acceptance is
+`POST /api/invitations/claim`; token validation and claiming are rate-limited.
+WMS users can be removed only after their access has been deactivated.
+
+No automated invitation integration-test project is currently configured.
+Before production, verify the complete signup/acceptance flow, email mismatch,
+unverified email, expired/revoked/reused tokens, Resend failures, concurrent
+acceptance, and preservation of the existing Admin after applying the migration.
+
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 
 Currently, two official plugins are available:

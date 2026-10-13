@@ -2,7 +2,6 @@ import { useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Alert,
   Box,
   Button,
   CircularProgress,
@@ -22,6 +21,8 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { ToastAlert as Alert } from '../components/ToastProvider';
+import { showToast } from '../lib/toast';
 import AddIcon from '@mui/icons-material/Add';
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined';
@@ -78,8 +79,10 @@ export function Categories() {
       }
       return category;
     },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: queryKeys.categories.all }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.categories.all });
+      showToast('Category created successfully.', 'success');
+    },
   });
   const updateMutation = useMutation({
     mutationFn: async ({
@@ -95,13 +98,17 @@ export function Categories() {
       }
       return category;
     },
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: queryKeys.categories.all }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.categories.all });
+      showToast('Category updated successfully.', 'success');
+    },
   });
   const deleteMutation = useMutation({
     mutationFn: deleteCategory,
-    onSuccess: () =>
-      queryClient.invalidateQueries({ queryKey: queryKeys.categories.all }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: queryKeys.categories.all });
+      showToast('Category deleted successfully.', 'success');
+    },
   });
   const isSaving = createMutation.isPending || updateMutation.isPending;
   const isDeleting = deleteMutation.isPending;

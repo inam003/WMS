@@ -2,7 +2,6 @@ import { useMemo, useRef, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Alert,
   Box,
   Button,
   CircularProgress,
@@ -16,6 +15,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { ToastAlert as Alert } from '../components/ToastProvider';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import { BarcodeScannerButton } from '../components/BarcodeScannerButton';
 import {
@@ -124,6 +124,32 @@ export function InventoryAdjustments() {
       warehousesQuery.refetch(),
       locationsQuery.refetch(),
     ]);
+  const quantity = Number(form.quantity);
+  const isQuantityValid =
+    form.quantity.trim().length > 0 &&
+    Number.isFinite(quantity) &&
+    quantity > 0 &&
+    quantity < 1_000_000_000_000_000 &&
+    Math.round(quantity * 1000) / 1000 === quantity;
+  const isExplanationValid =
+    form.explanation.trim().length <= 500 &&
+    (form.reason !== 'Other' || Boolean(form.explanation.trim()));
+  const isAdjustmentFormValid =
+    !isLoading &&
+    !optionsError &&
+    Boolean(form.productId && form.locationId && form.type && form.reason) &&
+    isQuantityValid &&
+    isExplanationValid;
+  const adjustmentValidationMessage =
+    !form.productId || !form.locationId || !form.type || !form.reason
+      ? 'Select a product, location, adjustment type, and reason.'
+      : !isQuantityValid
+        ? 'Enter a quantity greater than zero with up to three decimals.'
+        : form.reason === 'Other' && !form.explanation.trim()
+          ? 'Provide an explanation when the reason is Other.'
+          : !isExplanationValid
+            ? 'Explanation must be 500 characters or fewer.'
+            : undefined;
 
   const adjustmentMutation = useMutation({
     mutationFn: async ({
@@ -222,7 +248,7 @@ export function InventoryAdjustments() {
 
   return (
     <Box component="main" sx={{ py: { xs: 3, md: 5 } }}>
-      <Box sx={{ maxWidth: 1000, mx: 'auto', px: { xs: 2, sm: 3 } }}>
+      <Box sx={{ maxWidth: 1320, mx: 'auto', px: { xs: 2, sm: 3 } }}>
         <Stack direction="row" spacing={1.5} sx={{ mb: 3, alignItems: 'center' }}>
           <TuneOutlinedIcon color="primary" fontSize="large" />
           <Box>
@@ -432,14 +458,17 @@ export function InventoryAdjustments() {
                   slotProps={{ htmlInput: { maxLength: 500 } }}
                 />
               )}
+              {adjustmentValidationMessage && (
+                <Typography color="text.secondary" variant="body2" role="status">
+                  {adjustmentValidationMessage}
+                </Typography>
+              )}
               <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
                 <Button
                   type="submit"
                   variant="contained"
                   disabled={
-                    isLoading ||
-                    Boolean(optionsError) ||
-                    adjustmentMutation.isPending
+                    !isAdjustmentFormValid || adjustmentMutation.isPending
                   }
                 >
                   {adjustmentMutation.isPending

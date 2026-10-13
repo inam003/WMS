@@ -13,15 +13,35 @@ export type WmsRole =
 export interface WmsUser {
   subject: string;
   role: WmsRole;
+  email: string | null;
   isActive: boolean;
   createdAt: string;
   updatedAt: string;
+  accessProvisionedAt: string | null;
 }
 
 export interface CurrentWmsUser {
   subject: string;
   role: WmsRole;
   isActive: boolean;
+}
+
+export interface WmsInvitation {
+  id: string;
+  email: string;
+  role: WmsRole;
+  status: 'Pending' | 'Accepted' | 'Expired' | 'Revoked';
+  inviterSubject: string;
+  createdAt: string;
+  expiresAt: string;
+  acceptedAt: string | null;
+  acceptedSubject: string | null;
+}
+
+export interface ValidatedWmsInvitation {
+  email: string;
+  role: WmsRole;
+  expiresAt: string;
 }
 
 export interface AuditHistoryItem {
@@ -158,7 +178,15 @@ export interface InventoryTransaction {
   orderLineId: string | null;
 }
 
-export type CustomerOrderStatus = 'Draft' | 'Ready' | 'Dispatched' | 'Cancelled';
+export type CustomerOrderStatus =
+  | 'Draft'
+  | 'Ready'
+  | 'Dispatched'
+  | 'Cancelled'
+  | 0
+  | 1
+  | 2
+  | 3;
 
 export interface OrderLineRequest {
   productId: string;
@@ -353,11 +381,14 @@ export interface InventoryTransferRequest {
 interface ProblemDetails {
   title?: string;
   detail?: string;
+  message?: string;
+  code?: string;
   errors?: Record<string, string[]>;
 }
 
 export class ApiError extends Error {
   readonly status?: number;
+  readonly code?: string;
   readonly validationErrors?: Record<string, string[]>;
 
   constructor(
@@ -365,10 +396,12 @@ export class ApiError extends Error {
     status?: number,
     validationErrors?: Record<string, string[]>,
     options?: ErrorOptions,
+    code?: string,
   ) {
     super(message, options);
     this.name = 'ApiError';
     this.status = status;
+    this.code = code;
     this.validationErrors = validationErrors;
   }
 }
@@ -395,22 +428,22 @@ async function getBearerToken(): Promise<string> {
 
   if (!sessionResult.data?.session && sessionResult.error?.status !== undefined) {
     throw new ApiError(
-      `Could not check the Neon Auth session (HTTP ${sessionResult.error.status}).`,
+      `Could not check your sign-in session (HTTP ${sessionResult.error.status}).`,
     );
   }
 
   if (!sessionResult.data?.session) {
-    throw new ApiError('No active Neon Auth session was found. Sign in and try again.');
+    throw new ApiError('No active sign-in session was found. Sign in and try again.');
   }
 
   if (tokenResult.error?.status !== undefined) {
     throw new ApiError(
-      `Neon Auth could not provide an API token (HTTP ${tokenResult.error.status}).`,
+      `Your sign-in provider could not provide an access token (HTTP ${tokenResult.error.status}).`,
     );
   }
 
   throw new ApiError(
-    'A Neon Auth session exists, but it did not contain a usable API token.',
+    'Your sign-in session did not contain a usable access token.',
   );
 }
 
@@ -434,43 +467,21 @@ function parseProblemDetails(value: unknown): ProblemDetails {
   return {
     ...(typeof candidate.title === 'string' ? { title: candidate.title } : {}),
     ...(typeof candidate.detail === 'string' ? { detail: candidate.detail } : {}),
+    ...(typeof candidate.message === 'string' ? { message: candidate.message } : {}),
+    ...(typeof candidate.code === 'string' ? { code: candidate.code } : {}),
     ...(Object.keys(errors).length > 0 ? { errors } : {}),
   };
 }
 
-export async function authenticatedApiRequest<T>(
-  path: string,
-  init: RequestInit = {},
-): Promise<T | null> {
+function getApiBaseUrl(): string {
   const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
   if (!apiBaseUrl) {
     throw new ApiError('VITE_API_BASE_URL is not configured.');
   }
+  return apiBaseUrl.replace(/\/+$/, '');
+}
 
-  const token = await getBearerToken();
-  const headers = new Headers(init.headers);
-  headers.set('Authorization', `Bearer ${token}`);
-  headers.set('Accept', 'application/json');
-
-  let response: Response;
-  try {
-    response = await fetch(
-      `${apiBaseUrl.replace(/\/+$/, '')}${path}`,
-      { ...init, headers },
-    );
-  } catch (error) {
-    if (error instanceof Error && error.name === 'AbortError') {
-      throw error;
-    }
-
-    throw new ApiError(
-      'Could not reach the WMS API. Confirm it is running at VITE_API_BASE_URL and, when using HTTPS locally, trust the ASP.NET development certificate.',
-      undefined,
-      undefined,
-      { cause: error },
-    );
-  }
-
+async function readApiResponse<T>(response: Response): Promise<T | null> {
   const responseText = await response.text();
   let responseBody: unknown = null;
   let invalidJson = false;
@@ -489,6 +500,7 @@ export async function authenticatedApiRequest<T>(
       : undefined;
     const message =
       validationMessage ??
+      problem.message ??
       problem.detail ??
       problem.title ??
       (response.status === 401
@@ -497,7 +509,13 @@ export async function authenticatedApiRequest<T>(
           ? 'Your WMS account does not have permission for this action.'
           : undefined) ??
       `The API request failed (HTTP ${response.status}).`;
-    throw new ApiError(message, response.status, problem.errors);
+    throw new ApiError(
+      message,
+      response.status,
+      problem.errors,
+      undefined,
+      problem.code,
+    );
   }
 
   if (!responseText && response.status !== 204) {
@@ -509,6 +527,59 @@ export async function authenticatedApiRequest<T>(
   }
 
   return responseBody as T | null;
+}
+
+export async function authenticatedApiRequest<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T | null> {
+  const token = await getBearerToken();
+  const headers = new Headers(init.headers);
+  headers.set('Authorization', `Bearer ${token}`);
+  headers.set('Accept', 'application/json');
+
+  let response: Response;
+  try {
+    response = await fetch(
+      `${getApiBaseUrl()}${path}`,
+      { ...init, headers },
+    );
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw error;
+    }
+
+    throw new ApiError(
+      'Could not reach the WMS API. Confirm it is running at VITE_API_BASE_URL and, when using HTTPS locally, trust the ASP.NET development certificate.',
+      undefined,
+      undefined,
+      { cause: error },
+    );
+  }
+
+  return readApiResponse<T>(response);
+}
+
+export async function publicApiRequest<T>(
+  path: string,
+  init: RequestInit = {},
+): Promise<T | null> {
+  const headers = new Headers(init.headers);
+  headers.set('Accept', 'application/json');
+
+  let response: Response;
+  try {
+    response = await fetch(`${getApiBaseUrl()}${path}`, { ...init, headers });
+  } catch (error) {
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw error;
+    }
+    throw new ApiError('Could not reach the WMS API.', undefined, undefined, {
+      cause: error,
+    });
+  }
+
+  return readApiResponse<T>(response);
 }
 
 export async function getAuthenticatedApiUser(): Promise<AuthenticatedApiUser> {
@@ -556,6 +627,85 @@ export async function getWmsUsers(signal?: AbortSignal): Promise<WmsUser[]> {
   return users;
 }
 
+export async function getWmsInvitations(signal?: AbortSignal): Promise<WmsInvitation[]> {
+  const invitations = await authenticatedApiRequest<WmsInvitation[]>(
+    '/api/users/invitations',
+    { signal },
+  );
+  if (!Array.isArray(invitations)) {
+    throw new ApiError('The API returned an invalid invitation list.');
+  }
+  return invitations;
+}
+
+export async function createWmsInvitation(
+  email: string,
+  role: WmsRole,
+): Promise<WmsInvitation> {
+  const invitation = await authenticatedApiRequest<WmsInvitation>(
+    '/api/users/invitations',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, role }),
+    },
+  );
+  if (!invitation) throw new ApiError('The API returned no invitation.');
+  return invitation;
+}
+
+export async function resendWmsInvitation(id: string): Promise<WmsInvitation> {
+  const invitation = await authenticatedApiRequest<WmsInvitation>(
+    `/api/users/invitations/${encodeURIComponent(id)}/resend`,
+    { method: 'POST' },
+  );
+  if (!invitation) throw new ApiError('The API returned no updated invitation.');
+  return invitation;
+}
+
+export async function revokeWmsInvitation(id: string): Promise<WmsInvitation> {
+  const invitation = await authenticatedApiRequest<WmsInvitation>(
+    `/api/users/invitations/${encodeURIComponent(id)}/revoke`,
+    { method: 'POST' },
+  );
+  if (!invitation) throw new ApiError('The API returned no updated invitation.');
+  return invitation;
+}
+
+export async function validateWmsInvitation(
+  token: string,
+  signal?: AbortSignal,
+): Promise<ValidatedWmsInvitation> {
+  const invitation = await publicApiRequest<ValidatedWmsInvitation>(
+    '/api/invitations/validate',
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ token }),
+      signal,
+    },
+  );
+  if (!invitation) throw new ApiError('The API returned no invitation details.');
+  return invitation;
+}
+
+export async function claimWmsInvitation(
+  token: string,
+  signal?: AbortSignal,
+): Promise<ValidatedWmsInvitation> {
+  const invitation = await publicApiRequest<ValidatedWmsInvitation>(
+    '/api/invitations/claim',
+    {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ token }),
+    signal,
+    },
+  );
+  if (!invitation) throw new ApiError('The API returned no invitation details.');
+  return invitation;
+}
+
 export async function updateWmsUserRole(
   subject: string,
   role: WmsRole,
@@ -586,6 +736,13 @@ export async function updateWmsUserAccess(
   );
   if (!user) throw new ApiError('The API returned no updated WMS user.');
   return user;
+}
+
+export async function removeWmsUser(subject: string): Promise<void> {
+  await authenticatedApiRequest<null>(
+    `/api/users/${encodeURIComponent(subject)}`,
+    { method: 'DELETE' },
+  );
 }
 
 export async function getProducts(signal?: AbortSignal): Promise<Product[]> {

@@ -1,6 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
 import {
-  Alert,
   Box,
   Button,
   Card,
@@ -15,6 +14,8 @@ import {
   Stack,
   Typography,
 } from '@mui/material';
+import { ToastAlert as Alert } from '../components/ToastProvider';
+import { BarChart, LineChart, PieChart } from '@mui/x-charts';
 import ArrowForwardRoundedIcon from '@mui/icons-material/ArrowForwardRounded';
 import CategoryOutlinedIcon from '@mui/icons-material/CategoryOutlined';
 import HistoryOutlinedIcon from '@mui/icons-material/HistoryOutlined';
@@ -28,9 +29,11 @@ import {
   getInventory,
   getInventoryTransactions,
   getLocations,
+  getOrders,
   getProducts,
   getWarehouses,
 } from '../lib/api';
+import type { CustomerOrderStatus } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
 
 interface SummaryCardProps {
@@ -41,6 +44,55 @@ interface SummaryCardProps {
   to: string;
   icon: React.ReactNode;
   caption: string;
+}
+
+interface DashboardChartProps {
+  title: string;
+  subtitle: string;
+  loading: boolean;
+  error?: string;
+  empty: boolean;
+  children: React.ReactNode;
+}
+
+function DashboardChart({
+  title,
+  subtitle,
+  loading,
+  error,
+  empty,
+  children,
+}: DashboardChartProps) {
+  return (
+    <Paper variant="outlined" sx={{ height: '100%', minWidth: 0, overflow: 'hidden' }}>
+      <Box sx={{ px: 2.5, pt: 2.5 }}>
+        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+          {title}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {subtitle}
+        </Typography>
+      </Box>
+      {loading ? (
+        <Stack spacing={1.5} sx={{ minHeight: 300, alignItems: 'center', justifyContent: 'center' }} role="status">
+          <CircularProgress size={26} />
+          <Typography color="text.secondary">Loading chart…</Typography>
+        </Stack>
+      ) : error ? (
+        <Alert severity="error" sx={{ m: 2 }}>{error}</Alert>
+      ) : empty ? (
+        <Stack sx={{ minHeight: 300, alignItems: 'center', justifyContent: 'center', px: 3 }}>
+          <Typography color="text.secondary" sx={{ textAlign: 'center' }}>
+            Not enough data to display this chart yet.
+          </Typography>
+        </Stack>
+      ) : (
+        <Box sx={{ width: '100%', minWidth: 0, px: 1, pb: 1 }}>
+          {children}
+        </Box>
+      )}
+    </Paper>
+  );
 }
 
 function SummaryCard({
@@ -110,6 +162,9 @@ function formatDate(value: string): string {
 }
 
 export function Home() {
+  const movementStart = new Date();
+  movementStart.setMonth(movementStart.getMonth() - 11, 1);
+  movementStart.setHours(0, 0, 0, 0);
   const productsQuery = useQuery({
     queryKey: queryKeys.products.list,
     queryFn: ({ signal }) => getProducts(signal),
@@ -132,7 +187,15 @@ export function Home() {
   });
   const transactionsQuery = useQuery({
     queryKey: queryKeys.inventoryTransactions.list({}),
-    queryFn: ({ signal }) => getInventoryTransactions({}, signal),
+    queryFn: ({ signal }) =>
+      getInventoryTransactions(
+        { createdFrom: movementStart.toISOString() },
+        signal,
+      ),
+  });
+  const ordersQuery = useQuery({
+    queryKey: queryKeys.orders.all,
+    queryFn: ({ signal }) => getOrders(signal),
   });
   const queries = [
     productsQuery,
@@ -141,6 +204,7 @@ export function Home() {
     locationsQuery,
     inventoryQuery,
     transactionsQuery,
+    ordersQuery,
   ];
   const isRefreshing = queries.some((query) => query.isFetching);
   const errors = {
@@ -162,15 +226,113 @@ export function Home() {
     ...(transactionsQuery.isError
       ? { transactions: getError(transactionsQuery.error) }
       : {}),
+    ...(ordersQuery.isError ? { orders: getError(ordersQuery.error) } : {}),
   };
   const refreshDashboard = () =>
     Promise.all(queries.map((query) => query.refetch()));
 
   const hasPartialFailures = Object.keys(errors).length > 0;
-  const recentTransactions = transactionsQuery.data?.slice(0, 5) ?? [];
+  const recentTransactions = [...(transactionsQuery.data ?? [])]
+    .sort((left, right) =>
+      right.createdAt.localeCompare(left.createdAt),
+    )
+    .slice(0, 5);
+  const totalStock = inventoryQuery.data?.reduce(
+    (sum, record) => sum + record.quantity,
+    0,
+  );
+  const stockByProduct = new Map<string, number>();
+  inventoryQuery.data?.forEach((record) => {
+    stockByProduct.set(
+      record.productId,
+      (stockByProduct.get(record.productId) ?? 0) + record.quantity,
+    );
+  });
+  const lowStockCount =
+    productsQuery.data?.filter(
+      (product) =>
+        (stockByProduct.get(product.id) ?? 0) <= product.minimumStockLevel,
+    ).length ?? 0;
+  const warehouseStock = new Map<string, { name: string; quantity: number }>();
+  inventoryQuery.data?.forEach((record) => {
+    const warehouse = warehouseStock.get(record.warehouseId) ?? {
+      name: record.warehouseName,
+      quantity: 0,
+    };
+    warehouse.quantity += record.quantity;
+    warehouseStock.set(record.warehouseId, warehouse);
+  });
+  const warehouseChartData = [...warehouseStock.values()]
+    .sort((left, right) => right.quantity - left.quantity)
+    .slice(0, 10);
+  const topProducts = [...(productsQuery.data ?? [])]
+    .map((product) => ({
+      name:
+        product.name.length > 22
+          ? `${product.name.slice(0, 19)}…`
+          : product.name,
+      quantity: stockByProduct.get(product.id) ?? 0,
+    }))
+    .filter((product) => product.quantity > 0)
+    .sort((left, right) => right.quantity - left.quantity)
+    .slice(0, 8);
+  const orderStatuses = ['Draft', 'Ready', 'Dispatched', 'Cancelled'] as const;
+  const getOrderStatus = (status: CustomerOrderStatus) =>
+    typeof status === 'number' ? orderStatuses[status] : status;
+  const ordersByStatus = orderStatuses.map((status) => ({
+    id: status,
+    label: status,
+    value:
+      ordersQuery.data?.filter(
+        (order) => getOrderStatus(order.status) === status,
+      ).length ?? 0,
+  }));
+  const monthKeys: string[] = [];
+  const monthLabels: string[] = [];
+  for (let offset = 11; offset >= 0; offset -= 1) {
+    const date = new Date();
+    date.setDate(1);
+    date.setMonth(date.getMonth() - offset);
+    monthKeys.push(
+      `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`,
+    );
+    monthLabels.push(
+      date.toLocaleDateString(undefined, { month: 'short', year: '2-digit' }),
+    );
+  }
+  const receivedByMonth = new Map(monthKeys.map((key) => [key, 0]));
+  const dispatchedByMonth = new Map(monthKeys.map((key) => [key, 0]));
+  transactionsQuery.data?.forEach((transaction) => {
+    const date = new Date(transaction.createdAt);
+    const key = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}`;
+    if (transaction.type === 'Receipt') {
+      receivedByMonth.set(
+        key,
+        (receivedByMonth.get(key) ?? 0) + transaction.quantity,
+      );
+    } else if (transaction.type === 'Dispatch') {
+      dispatchedByMonth.set(
+        key,
+        (dispatchedByMonth.get(key) ?? 0) + transaction.quantity,
+      );
+    }
+  });
+  const receivedValues = monthKeys.map((key) => receivedByMonth.get(key) ?? 0);
+  const dispatchedValues = monthKeys.map((key) => dispatchedByMonth.get(key) ?? 0);
+  const movementAvailable =
+    receivedValues.some((value) => value > 0) ||
+    dispatchedValues.some((value) => value > 0);
+  const inventoryLoading = inventoryQuery.isPending;
+  const productStockLoading = inventoryQuery.isPending || productsQuery.isPending;
+  const movementLoading = transactionsQuery.isPending;
+  const warehouseChartError = errors.inventory;
+  const productChartError = errors.inventory ?? errors.products;
+  const movementChartError = errors.transactions;
+  const ordersChartError = errors.orders;
 
   return (
-    <Box sx={{ p: { xs: 2, sm: 3, lg: 4 }, maxWidth: 1500, mx: 'auto' }}>
+    <Box component="main" sx={{ py: { xs: 3, md: 5 } }}>
+      <Box sx={{ maxWidth: 1320, mx: 'auto', px: { xs: 2, sm: 3 } }}>
       <Stack
         direction={{ xs: 'column', sm: 'row' }}
         spacing={2}
@@ -273,18 +435,150 @@ export function Home() {
         </Grid>
         <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
           <SummaryCard
-            title="Inventory records"
-            value={inventoryQuery.data?.length}
+            title="Units in stock"
+            value={totalStock}
             loading={inventoryQuery.isPending}
             error={errors.inventory}
             to="/inventory"
             icon={<StorageOutlinedIcon />}
-            caption="Product-location stock records"
+            caption="Total quantity across all locations"
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+          <SummaryCard
+            title="Low-stock products"
+            value={lowStockCount}
+            loading={inventoryQuery.isPending || productsQuery.isPending}
+            error={errors.inventory ?? errors.products}
+            to="/inventory"
+            icon={<StorageOutlinedIcon />}
+            caption="At or below minimum stock level"
+          />
+        </Grid>
+        <Grid size={{ xs: 12, sm: 6, lg: 4 }}>
+          <SummaryCard
+            title="Open orders"
+            value={
+              ordersQuery.data?.filter(
+                (order) =>
+                  getOrderStatus(order.status) === 'Draft' ||
+                  getOrderStatus(order.status) === 'Ready',
+              ).length
+            }
+            loading={ordersQuery.isPending}
+            error={errors.orders}
+            to="/orders"
+            icon={<HistoryOutlinedIcon />}
+            caption="Draft and ready to dispatch"
           />
         </Grid>
       </Grid>
 
       <Grid container spacing={2}>
+        <Grid size={{ xs: 12, lg: 6 }}>
+          <DashboardChart
+            title="Stock by warehouse"
+            subtitle="Units currently available at each site"
+            loading={inventoryLoading}
+            error={warehouseChartError}
+            empty={warehouseChartData.length === 0}
+          >
+            <BarChart
+              height={320}
+              dataset={warehouseChartData}
+              xAxis={[{ scaleType: 'band', dataKey: 'name' }]}
+              series={[{ dataKey: 'quantity', label: 'Units in stock', color: '#2563eb' }]}
+              margin={{ left: 64, right: 20, top: 24, bottom: 48 }}
+              grid={{ horizontal: true }}
+              hideLegend
+            />
+          </DashboardChart>
+        </Grid>
+        <Grid size={{ xs: 12, lg: 6 }}>
+          <DashboardChart
+            title="Stock movement trends"
+            subtitle="Monthly quantities received and dispatched"
+            loading={movementLoading}
+            error={movementChartError}
+            empty={!movementAvailable}
+          >
+            <LineChart
+              height={320}
+              xAxis={[{ scaleType: 'band', data: monthLabels }]}
+              series={[
+                { data: receivedValues, label: 'Received', color: '#16a34a', curve: 'monotoneX' },
+                { data: dispatchedValues, label: 'Dispatched', color: '#f97316', curve: 'monotoneX' },
+              ]}
+              margin={{ left: 64, right: 24, top: 24, bottom: 48 }}
+              grid={{ horizontal: true }}
+            />
+          </DashboardChart>
+        </Grid>
+        <Grid size={{ xs: 12, lg: 6 }}>
+          <DashboardChart
+            title="Orders by status"
+            subtitle="Current order workflow"
+            loading={ordersQuery.isPending}
+            error={ordersChartError}
+            empty={!ordersQuery.data?.length}
+          >
+            <PieChart
+              height={320}
+              series={[
+                {
+                  data: ordersByStatus,
+                  innerRadius: 58,
+                  outerRadius: 112,
+                  paddingAngle: 2,
+                  cornerRadius: 4,
+                  arcLabel: 'value',
+                },
+              ]}
+              slotProps={{ legend: { position: { vertical: 'middle', horizontal: 'end' } } }}
+              margin={{ left: 12, right: 24, top: 20, bottom: 20 }}
+            />
+          </DashboardChart>
+        </Grid>
+        <Grid size={{ xs: 12, lg: 6 }}>
+          <DashboardChart
+            title="Receiving vs. dispatch"
+            subtitle="Monthly units moved in and out"
+            loading={movementLoading}
+            error={movementChartError}
+            empty={!movementAvailable}
+          >
+            <BarChart
+              height={320}
+              xAxis={[{ scaleType: 'band', data: monthLabels }]}
+              series={[
+                { data: receivedValues, label: 'Received', stack: 'quantity', color: '#16a34a' },
+                { data: dispatchedValues, label: 'Dispatched', stack: 'quantity', color: '#f97316' },
+              ]}
+              margin={{ left: 64, right: 24, top: 24, bottom: 48 }}
+              grid={{ horizontal: true }}
+            />
+          </DashboardChart>
+        </Grid>
+        <Grid size={{ xs: 12 }}>
+          <DashboardChart
+            title="Top products by stock"
+            subtitle="Products with the most units across all locations"
+            loading={productStockLoading}
+            error={productChartError}
+            empty={topProducts.length === 0}
+          >
+            <BarChart
+              height={340}
+              layout="horizontal"
+              dataset={topProducts}
+              yAxis={[{ scaleType: 'band', dataKey: 'name' }]}
+              series={[{ dataKey: 'quantity', label: 'Units in stock', color: '#6366f1' }]}
+              margin={{ left: 140, right: 36, top: 24, bottom: 48 }}
+              grid={{ vertical: true }}
+              hideLegend
+            />
+          </DashboardChart>
+        </Grid>
         <Grid size={{ xs: 12 }}>
           <Paper variant="outlined" sx={{ height: '100%', overflow: 'hidden' }}>
             <Stack
@@ -361,6 +655,7 @@ export function Home() {
           </Paper>
         </Grid>
       </Grid>
+      </Box>
     </Box>
   );
 }

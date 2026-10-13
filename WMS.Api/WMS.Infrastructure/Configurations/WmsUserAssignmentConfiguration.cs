@@ -20,6 +20,7 @@ public sealed class WmsUserAssignmentConfiguration :
         builder.Property(user => user.IsActive)
             .IsRequired()
             .HasDefaultValue(true);
+        builder.Property(user => user.AccessProvisionedAt);
         builder.Property(user => user.CreatedAt)
             .IsRequired()
             .HasDefaultValueSql("CURRENT_TIMESTAMP");

@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Alert,
   Box,
   Button,
   CircularProgress,
@@ -15,6 +14,7 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { ToastAlert as Alert } from '../components/ToastProvider';
 import MoveToInboxOutlinedIcon from '@mui/icons-material/MoveToInboxOutlined';
 import { BarcodeScannerButton } from '../components/BarcodeScannerButton';
 import {
@@ -49,6 +49,10 @@ const emptyForm: ReceiptFormValues = {
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : 'The request failed.';
+}
+
+function isGuid(value: string): boolean {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
 export function Receiving() {
@@ -107,6 +111,28 @@ export function Receiving() {
       warehousesQuery.refetch(),
       locationsQuery.refetch(),
     ]);
+  const quantity = Number(form.quantity);
+  const isQuantityValid =
+    form.quantity.trim().length > 0 &&
+    Number.isFinite(quantity) &&
+    quantity > 0 &&
+    quantity < 1_000_000_000_000_000 &&
+    Math.round(quantity * 1000) / 1000 === quantity;
+  const isReferenceValid =
+    !form.referenceId.trim() || isGuid(form.referenceId.trim());
+  const isReceiptFormValid =
+    !isLoading &&
+    !optionsError &&
+    Boolean(form.productId && form.locationId) &&
+    isQuantityValid &&
+    isReferenceValid;
+  const receiptValidationMessage = !form.productId || !form.locationId
+    ? 'Select a product and receiving location.'
+    : !isQuantityValid
+      ? 'Enter a quantity greater than zero with up to three decimals.'
+      : !isReferenceValid
+        ? 'Reference ID must be a valid GUID.'
+        : undefined;
 
   const receiptMutation = useMutation({
     mutationFn: async ({
@@ -193,7 +219,7 @@ export function Receiving() {
 
   return (
     <Box component="main" sx={{ py: { xs: 3, md: 5 } }}>
-      <Box sx={{ maxWidth: 1000, mx: 'auto', px: { xs: 2, sm: 3 } }}>
+      <Box sx={{ maxWidth: 1320, mx: 'auto', px: { xs: 2, sm: 3 } }}>
         <Stack direction="row" spacing={1.5} sx={{ mb: 3, alignItems: 'center' }}>
           <MoveToInboxOutlinedIcon color="primary" fontSize="large" />
           <Box>
@@ -355,16 +381,20 @@ export function Receiving() {
                     updateForm('referenceId', event.target.value)
                   }
                   helperText="Optional external receipt reference (GUID)."
+                  error={!isReferenceValid}
                 />
               </Stack>
+              {receiptValidationMessage && (
+                <Typography color="text.secondary" variant="body2" role="status">
+                  {receiptValidationMessage}
+                </Typography>
+              )}
               <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
                 <Button
                   type="submit"
                   variant="contained"
                   disabled={
-                    isLoading ||
-                    Boolean(optionsError) ||
-                    receiptMutation.isPending
+                    !isReceiptFormValid || receiptMutation.isPending
                   }
                 >
                   {receiptMutation.isPending ? 'Recording receipt…' : 'Record receipt'}

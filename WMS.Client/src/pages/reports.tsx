@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Alert,
   Box,
   Button,
   CircularProgress,
@@ -23,6 +22,8 @@ import {
   TextField,
   Typography,
 } from '@mui/material';
+import { ToastAlert as Alert } from '../components/ToastProvider';
+import { DateFilterField } from '../components/DateFilterField';
 import FileDownloadOutlinedIcon from '@mui/icons-material/FileDownloadOutlined';
 import {
   getLocations,
@@ -444,7 +445,7 @@ export function Reports() {
 
   return (
     <Box component="main" sx={{ py: { xs: 3, md: 5 } }}>
-      <Box sx={{ maxWidth: 1440, mx: 'auto', px: { xs: 2, sm: 3 } }}>
+      <Box sx={{ maxWidth: 1320, mx: 'auto', px: { xs: 2, sm: 3 } }}>
         <Box sx={{ mb: 3 }}>
           <Typography
             variant="overline"
@@ -576,21 +577,15 @@ export function Reports() {
               )}
               {kind !== 'stock' && (
                 <>
-                  <TextField
-                    size="small"
-                    type="date"
+                  <DateFilterField
                     label="Start date"
                     value={filters.startDate}
-                    onChange={(event) => updateFilter('startDate', event.target.value)}
-                    slotProps={{ inputLabel: { shrink: true } }}
+                    onChange={(value) => updateFilter('startDate', value)}
                   />
-                  <TextField
-                    size="small"
-                    type="date"
+                  <DateFilterField
                     label="End date"
                     value={filters.endDate}
-                    onChange={(event) => updateFilter('endDate', event.target.value)}
-                    slotProps={{ inputLabel: { shrink: true } }}
+                    onChange={(value) => updateFilter('endDate', value)}
                   />
                 </>
               )}

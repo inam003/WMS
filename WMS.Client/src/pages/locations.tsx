@@ -2,7 +2,6 @@ import { useMemo, useState } from 'react';
 import type { FormEvent } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
-  Alert,
   Box,
   Button,
   Checkbox,
@@ -29,6 +28,8 @@ import {
   Tooltip,
   Typography,
 } from '@mui/material';
+import { ToastAlert as Alert } from '../components/ToastProvider';
+import { showToast } from '../lib/toast';
 import AddIcon from '@mui/icons-material/Add';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutlineOutlined';
 import EditOutlinedIcon from '@mui/icons-material/EditOutlined';
@@ -124,7 +125,10 @@ export function Locations() {
       }
       return location;
     },
-    onSuccess: invalidateLocationData,
+    onSuccess: async () => {
+      await invalidateLocationData();
+      showToast('Location created successfully.', 'success');
+    },
   });
   const updateMutation = useMutation({
     mutationFn: async ({
@@ -140,11 +144,17 @@ export function Locations() {
       }
       return location;
     },
-    onSuccess: invalidateLocationData,
+    onSuccess: async () => {
+      await invalidateLocationData();
+      showToast('Location updated successfully.', 'success');
+    },
   });
   const deleteMutation = useMutation({
     mutationFn: deleteLocation,
-    onSuccess: invalidateLocationData,
+    onSuccess: async () => {
+      await invalidateLocationData();
+      showToast('Location deleted successfully.', 'success');
+    },
   });
   const isSaving = createMutation.isPending || updateMutation.isPending;
   const isDeleting = deleteMutation.isPending;

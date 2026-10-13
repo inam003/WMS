@@ -1,7 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Alert,
   Box,
   Button,
   CircularProgress,
@@ -19,6 +18,7 @@ import {
   TableRow,
   Typography,
 } from '@mui/material';
+import { ToastAlert as Alert } from '../components/ToastProvider';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import {
   getInventory,

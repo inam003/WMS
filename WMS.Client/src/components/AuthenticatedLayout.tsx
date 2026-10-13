@@ -1,7 +1,6 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
-  Alert,
   AppBar,
   Avatar,
   Box,
@@ -16,10 +15,13 @@ import {
   ListItemText,
   Menu,
   MenuItem,
+  Paper,
+  Stack,
   Tooltip,
   Toolbar,
   Typography,
 } from '@mui/material';
+import { ToastAlert as Alert } from './ToastProvider';
 import MenuIcon from '@mui/icons-material/Menu';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
@@ -38,13 +40,15 @@ import AssessmentOutlinedIcon from '@mui/icons-material/AssessmentOutlined';
 import ManageAccountsOutlinedIcon from '@mui/icons-material/ManageAccountsOutlined';
 import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined';
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
+import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined';
+import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
 import {
   RedirectToSignIn,
   SignedIn,
 } from '@neondatabase/neon-js/auth/react/ui';
 import { Link as RouterLink, NavLink, Outlet } from 'react-router-dom';
 import { neon } from '../lib/neon';
-import { getCurrentWmsUser } from '../lib/api';
+import { ApiError, getCurrentWmsUser } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
 import {
   WmsAccessProvider,
@@ -107,7 +111,6 @@ function ProfileMenu({
   compact?: boolean;
   onNavigate?: () => void;
 }) {
-  const wmsUser = useWmsAccess();
   const session = neon.auth.useSession();
   const user = session.data?.user;
   const [profileAnchor, setProfileAnchor] = useState<HTMLElement | null>(null);
@@ -161,12 +164,26 @@ function ProfileMenu({
             minWidth: compact ? 44 : undefined,
             justifyContent: compact || collapsed ? 'center' : 'flex-start',
             gap: 1.25,
-            px: compact || collapsed ? 0 : 1,
+            px: compact ? 1 : collapsed ? 0 : 1,
             color: 'text.secondary',
             borderRadius: 1,
             '&:hover': { bgcolor: 'action.hover' },
           }}
         >
+          {compact && (
+            <Typography
+              variant="body2"
+              noWrap
+              sx={{
+                display: { xs: 'none', sm: 'block' },
+                maxWidth: 220,
+                fontWeight: 600,
+                color: 'text.primary',
+              }}
+            >
+              {displayName}
+            </Typography>
+          )}
           <Avatar
             sx={{
               width: 34,
@@ -236,9 +253,6 @@ function ProfileMenu({
                 {user.email}
               </Typography>
             )}
-            <Typography variant="caption" color="text.secondary" noWrap>
-              WMS role: {wmsUser.role.replace(/([a-z])([A-Z])/g, '$1 $2')}
-            </Typography>
           </Box>
         </Box>
         <Divider sx={{ my: 0.75 }} />
@@ -336,6 +350,7 @@ function SidebarContents({
           px: '6px',
           gap: 1,
           justifyContent: 'flex-start',
+          flexShrink: 0,
         }}
       >
         {collapsed && onToggle ? (
@@ -422,79 +437,95 @@ function SidebarContents({
           </IconButton>
         )}
       </Toolbar>
-      {!collapsed && (
-        <Typography
-          variant="caption"
-          color="text.secondary"
-          sx={{ px: 2.25, pb: 1, fontWeight: 600 }}
-        >
-          WMS role: {wmsUser.role.replace(/([a-z])([A-Z])/g, '$1 $2')}
-        </Typography>
-      )}
-      <List
+      <Box
         sx={{
+          flexGrow: 1,
+          minHeight: 0,
+          overflowY: 'auto',
+          overflowX: 'hidden',
           px: 1.5,
-          py: 0,
-          display: 'grid',
-          gap: 0.5,
+          py: 0.5,
+          scrollbarWidth: 'none',
+          '&::-webkit-scrollbar': {
+            display: 'none',
+          },
         }}
       >
-        {visibleNavigation.map((item) => (
-          <Tooltip
-            key={item.to}
-            title={collapsed ? item.label : ''}
-            placement="right"
-          >
-            <ListItemButton
-              component={NavLink}
-              to={item.to}
-              end={item.to === '/'}
-              onClick={onNavigate}
-              aria-label={collapsed ? item.label : undefined}
-              sx={{
-                minHeight: 44,
-                justifyContent: 'flex-start',
-                px: '6px',
-                borderRadius: 1,
-                color: 'text.secondary',
-                transition: 'background-color 160ms ease, color 160ms ease',
-                '& .MuiListItemIcon-root': {
-                  color: 'primary.main',
-                  minWidth: 38,
-                  width: 38,
-                  flexShrink: 0,
-                  justifyContent: 'center',
-                  '& .MuiSvgIcon-root': { fontSize: 24 },
-                },
-                '&:hover': {
-                  bgcolor: 'action.hover',
-                  color: 'text.primary',
-                },
-                '&.active': {
-                  color: 'common.white',
-                  bgcolor: 'primary.main',
-                  fontWeight: 700,
-                  '& .MuiListItemIcon-root': { color: 'common.white' },
-                  '&:hover': { bgcolor: 'primary.light' },
-                },
-              }}
+        <List
+          sx={{
+            p: 0,
+            display: 'grid',
+            gap: 0.5,
+            alignContent: 'start',
+          }}
+        >
+          {visibleNavigation.map((item) => (
+            <Tooltip
+              key={item.to}
+              title={collapsed ? item.label : ''}
+              placement="right"
             >
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              {!collapsed && (
-                <ListItemText
-                  primary={item.label}
-                  slotProps={{
-                    primary: { variant: 'body2', sx: { fontWeight: 600 } },
-                  }}
-                />
-              )}
-            </ListItemButton>
-          </Tooltip>
-        ))}
-      </List>
-      <Box sx={{ flexGrow: 1 }} />
+              <ListItemButton
+                component={NavLink}
+                to={item.to}
+                end={item.to === '/'}
+                onClick={onNavigate}
+                aria-label={collapsed ? item.label : undefined}
+                sx={{
+                  width: collapsed ? 48 : '100%',
+                  maxWidth: collapsed ? 48 : 'none',
+                  minWidth: 0,
+                  minHeight: collapsed ? 48 : 44,
+                  mx: 'auto',
+                  justifyContent: collapsed ? 'center' : 'flex-start',
+                  px: collapsed ? 0 : '6px',
+                  borderRadius: 1,
+                  color: 'text.secondary',
+                  transition: 'background-color 160ms ease, color 160ms ease',
+                  '& .MuiListItemIcon-root': {
+                    color: 'primary.main',
+                    minWidth: collapsed ? 0 : 38,
+                    width: collapsed ? 'auto' : 38,
+                    flexShrink: 0,
+                    justifyContent: 'center',
+                    '& .MuiSvgIcon-root': { fontSize: 24 },
+                  },
+                  '&:hover': {
+                    bgcolor: 'action.hover',
+                    color: 'text.primary',
+                  },
+                  '&.active': {
+                    color: 'common.white',
+                    bgcolor: 'primary.main',
+                    fontWeight: 700,
+                    '& .MuiListItemIcon-root': { color: 'common.white' },
+                    '&:hover': { bgcolor: 'primary.light' },
+                  },
+                }}
+              >
+                <ListItemIcon>{item.icon}</ListItemIcon>
+                {!collapsed && (
+                  <ListItemText
+                    primary={item.label}
+                    slotProps={{
+                      primary: { variant: 'body2', sx: { fontWeight: 600 } },
+                    }}
+                  />
+                )}
+              </ListItemButton>
+            </Tooltip>
+          ))}
+        </List>
+      </Box>
       {showAccount && (
-        <Box sx={{ p: collapsed ? 1 : 1.5 }}>
+        <Box
+          sx={{
+            p: collapsed ? 1 : 1.5,
+            flexShrink: 0,
+            borderTop: 1,
+            borderColor: 'divider',
+          }}
+        >
           <ProfileMenu collapsed={collapsed} onNavigate={onNavigate} />
         </Box>
       )}
@@ -505,87 +536,117 @@ function SidebarContents({
 function AuthenticatedShell() {
   const [mobileOpen, setMobileOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { role } = useWmsAccess();
   const closeMobileDrawer = () => setMobileOpen(false);
 
   return (
     <Box
-          sx={{
-            display: 'flex',
-            minHeight: '100vh',
-            bgcolor: 'background.default',
-          }}
-        >
-          <Drawer
-            variant="permanent"
-            sx={{
-              display: { xs: 'none', md: 'block' },
-              width: sidebarCollapsed ? collapsedDrawerWidth : drawerWidth,
-              flexShrink: 0,
-              transition: 'width 180ms ease',
-              '& .MuiDrawer-paper': {
-                width: sidebarCollapsed ? collapsedDrawerWidth : drawerWidth,
-                position: 'relative',
-                boxSizing: 'border-box',
-                borderRight: 1,
-                borderColor: 'divider',
-                overflowX: 'hidden',
-                transition: 'width 180ms ease',
-              },
-            }}
-            open
-          >
-            <SidebarContents
-              collapsed={sidebarCollapsed}
-              onToggle={() => setSidebarCollapsed((collapsed) => !collapsed)}
-            />
-          </Drawer>
+      sx={{
+        display: 'flex',
+        height: '100vh',
+        maxHeight: '100vh',
+        overflow: 'hidden',
+        bgcolor: 'background.default',
+      }}
+    >
+      <Drawer
+        variant="permanent"
+        sx={{
+          display: { xs: 'none', md: 'block' },
+          width: sidebarCollapsed ? collapsedDrawerWidth : drawerWidth,
+          flexShrink: 0,
+          height: '100vh',
+          transition: 'width 180ms ease',
+          '& .MuiDrawer-paper': {
+            width: sidebarCollapsed ? collapsedDrawerWidth : drawerWidth,
+            height: '100vh',
+            maxHeight: '100vh',
+            position: 'sticky',
+            top: 0,
+            boxSizing: 'border-box',
+            borderRight: 1,
+            borderColor: 'divider',
+            backgroundImage: 'none',
+            bgcolor: 'background.paper',
+            overflow: 'hidden',
+            transition: 'width 180ms ease',
+          },
+        }}
+        open
+      >
+        <SidebarContents
+          collapsed={sidebarCollapsed}
+          showAccount={false}
+          onToggle={() => setSidebarCollapsed((collapsed) => !collapsed)}
+        />
+      </Drawer>
 
-          <Drawer
-            variant="temporary"
-            open={mobileOpen}
-            onClose={closeMobileDrawer}
-            ModalProps={{ keepMounted: true }}
-            sx={{
-              display: { xs: 'block', md: 'none' },
-              '& .MuiDrawer-paper': {
-                width: drawerWidth,
-                boxSizing: 'border-box',
-              },
-            }}
-          >
-            <SidebarContents onNavigate={closeMobileDrawer} showAccount={false} />
-          </Drawer>
+      <Drawer
+        variant="temporary"
+        open={mobileOpen}
+        onClose={closeMobileDrawer}
+        ModalProps={{ keepMounted: true }}
+        sx={{
+          display: { xs: 'block', md: 'none' },
+          '& .MuiDrawer-paper': {
+            width: drawerWidth,
+            height: '100%',
+            boxSizing: 'border-box',
+            overflow: 'hidden',
+          },
+        }}
+      >
+        <SidebarContents onNavigate={closeMobileDrawer} showAccount={false} />
+      </Drawer>
 
-          <Box
-            component="main"
-            sx={{
-              flexGrow: 1,
-              minWidth: 0,
-              height: '100vh',
-              overflowY: 'auto',
-            }}
-          >
+      <Box
+        component="main"
+        sx={{
+          flexGrow: 1,
+          minWidth: 0,
+          height: '100vh',
+          overflowY: 'auto',
+        }}
+      >
             <AppBar
               position="sticky"
               color="inherit"
               elevation={0}
               sx={{
-                display: { xs: 'block', md: 'none' },
-                borderBottom: 1,
+                bgcolor: 'background.paper',
+                  backgroundImage: 'none',
+                  borderBottom: 1,
                 borderColor: 'divider',
               }}
             >
-              <Toolbar sx={{ gap: 1 }}>
+              <Toolbar
+                sx={{
+                  gap: 1,
+                  minHeight: '72px !important',
+                  px: { xs: 1, md: 3 },
+                }}
+              >
                 <IconButton
                   edge="start"
                   onClick={() => setMobileOpen(true)}
                   aria-label="Open navigation menu"
+                  sx={{ display: { xs: 'inline-flex', md: 'none' } }}
                 >
                   <MenuIcon />
                 </IconButton>
-                <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 800 }}>
+                <Typography
+                  variant="h6"
+                  sx={{ display: { xs: 'block', md: 'none' }, fontWeight: 800 }}
+                >
                   WMS
                 </Typography>
+                <Typography
+                  variant="subtitle1"
+                  sx={{ display: { xs: 'none', md: 'block' }, fontWeight: 700 }}
+                >
+                  {role.replace(/([a-z])([A-Z])/g, '$1 $2')}
+                </Typography>
+                <Box sx={{ flexGrow: 1 }} />
                 <ProfileMenu compact />
               </Toolbar>
             </AppBar>
@@ -596,6 +657,8 @@ function AuthenticatedShell() {
 }
 
 function WmsAccessGate() {
+  const [isSigningOut, setIsSigningOut] = useState(false);
+  const [signOutError, setSignOutError] = useState<string>();
   const userQuery = useQuery({
     queryKey: queryKeys.wmsUsers.current,
     queryFn: getCurrentWmsUser,
@@ -625,16 +688,102 @@ function WmsAccessGate() {
         ? userQuery.error.status
         : undefined;
     const message =
-      status === 401
+      userQuery.error instanceof ApiError &&
+      userQuery.error.code === 'WMS_INVITATION_REQUIRED'
+        ? 'Your account is signed in, but it has not been given access to this warehouse yet.'
+        : userQuery.error instanceof ApiError &&
+            userQuery.error.code === 'WMS_ACCESS_INACTIVE'
+          ? 'Your warehouse access has been turned off. Contact your warehouse administrator if you think this is a mistake.'
+          : status === 401
         ? 'Your sign-in has expired. Sign in again to continue.'
         : status === 403 || !userQuery.data?.isActive
-          ? 'Your WMS access is inactive or unavailable. Contact an administrator.'
+          ? 'Your warehouse access is unavailable. Contact your warehouse administrator.'
           : userQuery.error instanceof Error
             ? userQuery.error.message
-            : 'WMS access could not be verified.';
+            : 'We could not check your warehouse access right now.';
+    const needsInvitation =
+      userQuery.error instanceof ApiError &&
+      userQuery.error.code === 'WMS_INVITATION_REQUIRED';
+    const signOut = async () => {
+      setIsSigningOut(true);
+      setSignOutError(undefined);
+      try {
+        const result = await neon.auth.signOut();
+        if (result.error) {
+          setSignOutError(result.error.message || 'Could not sign out.');
+        }
+      } catch (error) {
+        setSignOutError(
+          error instanceof Error ? error.message : 'Could not sign out.',
+        );
+      } finally {
+        setIsSigningOut(false);
+      }
+    };
     return (
-      <Box sx={{ maxWidth: 640, mx: 'auto', p: 3 }}>
-        <Alert severity="error">{message}</Alert>
+      <Box
+        component="main"
+        sx={{
+          minHeight: '100vh',
+          display: 'grid',
+          placeItems: 'center',
+          bgcolor: 'background.default',
+          px: { xs: 2, sm: 3 },
+          py: { xs: 3, md: 5 },
+        }}
+      >
+        <Paper
+          variant="outlined"
+          sx={{ width: '100%', maxWidth: 560, p: { xs: 3, sm: 4 } }}
+        >
+          <Stack spacing={2.5}>
+            <Box
+              sx={{
+                width: 56,
+                height: 56,
+                display: 'grid',
+                placeItems: 'center',
+                borderRadius: '50%',
+                color: needsInvitation ? 'error.main' : 'primary.main',
+                bgcolor: needsInvitation
+                  ? 'rgba(211, 47, 47, 0.12)'
+                  : 'action.hover',
+              }}
+            >
+              {needsInvitation ? (
+                <BlockOutlinedIcon sx={{ fontSize: 42 }} />
+              ) : (
+                <ShieldOutlinedIcon fontSize="large" />
+              )}
+            </Box>
+            <Box>
+              <Typography variant="overline" color="primary" sx={{ fontWeight: 700 }}>
+                WAREHOUSE MANAGEMENT
+              </Typography>
+              <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
+                {needsInvitation ? 'Access not set up yet' : 'We can’t open your workspace'}
+              </Typography>
+            </Box>
+            <Alert severity={needsInvitation ? 'info' : 'error'}>
+              {message}
+              {needsInvitation && (
+                <>
+                  {' '}If you have an invitation, create an account with the same email
+                  address and complete email verification. Contact your WMS Admin if you
+                  still cannot access the workspace.
+                </>
+              )}
+            </Alert>
+            {signOutError && <Alert severity="error">{signOutError}</Alert>}
+            <Button
+              variant="outlined"
+              onClick={() => void signOut()}
+              disabled={isSigningOut}
+            >
+              {isSigningOut ? 'Signing out…' : 'Sign out'}
+            </Button>
+          </Stack>
+        </Paper>
       </Box>
     );
   }
