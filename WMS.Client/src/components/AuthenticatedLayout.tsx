@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, type ReactElement } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   AppBar,
+  alpha,
   Avatar,
   Box,
   Button,
   CircularProgress,
+  Collapse,
   Divider,
   Drawer,
   IconButton,
@@ -25,6 +27,8 @@ import { ToastAlert as Alert } from './ToastProvider';
 import MenuIcon from '@mui/icons-material/Menu';
 import ChevronLeftIcon from '@mui/icons-material/ChevronLeft';
 import ChevronRightIcon from '@mui/icons-material/ChevronRight';
+import DashboardOutlinedIcon from '@mui/icons-material/DashboardOutlined';
+import ExpandMoreIcon from '@mui/icons-material/ExpandMore';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
 import Inventory2OutlinedIcon from '@mui/icons-material/Inventory2Outlined';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
@@ -42,17 +46,12 @@ import AccountCircleOutlinedIcon from '@mui/icons-material/AccountCircleOutlined
 import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
 import BlockOutlinedIcon from '@mui/icons-material/BlockOutlined';
 import ShieldOutlinedIcon from '@mui/icons-material/ShieldOutlined';
-import {
-  RedirectToSignIn,
-  SignedIn,
-} from '@neondatabase/neon-js/auth/react/ui';
-import { Link as RouterLink, NavLink, Outlet } from 'react-router-dom';
+import { RedirectToSignIn, SignedIn } from '@neondatabase/neon-js/auth/react/ui';
+import { Link as RouterLink, NavLink, Outlet, useLocation } from 'react-router-dom';
 import { neon } from '../lib/neon';
 import { ApiError, getCurrentWmsUser } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
-import {
-  WmsAccessProvider,
-} from './WmsAccessContext';
+import { WmsAccessProvider } from './WmsAccessContext';
 import { useWmsAccess } from '../hooks/useWmsAccess';
 import logoOpen from '../assets/logo-open.png';
 import logoClose from '../assets/logo-close.png';
@@ -60,36 +59,57 @@ import logoClose from '../assets/logo-close.png';
 const drawerWidth = 264;
 const collapsedDrawerWidth = 76;
 
-const navigation = [
-  { label: 'Dashboard', to: '/', icon: <HomeOutlinedIcon /> },
-  { label: 'Products', to: '/products', icon: <Inventory2OutlinedIcon /> },
-  { label: 'Categories', to: '/categories', icon: <CategoryOutlinedIcon /> },
-  { label: 'Warehouses', to: '/warehouses', icon: <WarehouseOutlinedIcon /> },
-  { label: 'Locations', to: '/locations', icon: <PlaceOutlinedIcon /> },
-  { label: 'Inventory', to: '/inventory', icon: <StorageOutlinedIcon /> },
+interface NavItem {
+  label: string;
+  to: string;
+  icon: ReactElement;
+}
+
+const navigationGroups: { label: string; icon: ReactElement; items: NavItem[] }[] = [
   {
-    label: 'Adjustments',
-    to: '/inventory-adjustments',
-    icon: <TuneOutlinedIcon />,
-  },
-  { label: 'Receiving', to: '/receiving', icon: <MoveToInboxOutlinedIcon /> },
-  {
-    label: 'Transfers',
-    to: '/warehouse-transfers',
-    icon: <SwapHorizOutlinedIcon />,
-  },
-  { label: 'Orders', to: '/orders', icon: <ShoppingCartOutlinedIcon /> },
-  { label: 'Reports', to: '/reports', icon: <AssessmentOutlinedIcon /> },
-  { label: 'Users', to: '/users', icon: <ManageAccountsOutlinedIcon /> },
-  {
-    label: 'Audit History',
-    to: '/audit-history',
-    icon: <HistoryOutlinedIcon />,
+    label: 'Overview',
+    icon: <DashboardOutlinedIcon />,
+    items: [
+      { label: 'Dashboard', to: '/', icon: <HomeOutlinedIcon /> },
+      { label: 'Reports', to: '/reports', icon: <AssessmentOutlinedIcon /> },
+    ],
   },
   {
-    label: 'Transactions',
-    to: '/inventory-transactions',
-    icon: <HistoryOutlinedIcon />,
+    label: 'Catalog',
+    icon: <Inventory2OutlinedIcon />,
+    items: [
+      { label: 'Products', to: '/products', icon: <Inventory2OutlinedIcon /> },
+      { label: 'Categories', to: '/categories', icon: <CategoryOutlinedIcon /> },
+    ],
+  },
+  {
+    label: 'Warehouse',
+    icon: <WarehouseOutlinedIcon />,
+    items: [
+      { label: 'Warehouses', to: '/warehouses', icon: <WarehouseOutlinedIcon /> },
+      { label: 'Locations', to: '/locations', icon: <PlaceOutlinedIcon /> },
+    ],
+  },
+  {
+    label: 'Stock',
+    icon: <StorageOutlinedIcon />,
+    items: [
+      { label: 'Inventory', to: '/inventory', icon: <StorageOutlinedIcon /> },
+      { label: 'Receiving', to: '/receiving', icon: <MoveToInboxOutlinedIcon /> },
+      { label: 'Adjustments', to: '/inventory-adjustments', icon: <TuneOutlinedIcon /> },
+      { label: 'Transfers', to: '/warehouse-transfers', icon: <SwapHorizOutlinedIcon /> },
+      { label: 'Transactions', to: '/inventory-transactions', icon: <HistoryOutlinedIcon /> },
+    ],
+  },
+  {
+    label: 'Sales',
+    icon: <ShoppingCartOutlinedIcon />,
+    items: [{ label: 'Orders', to: '/orders', icon: <ShoppingCartOutlinedIcon /> }],
+  },
+  {
+    label: 'Administration',
+    icon: <ManageAccountsOutlinedIcon />,
+    items: [{ label: 'Users', to: '/users', icon: <ManageAccountsOutlinedIcon /> }],
   },
 ];
 
@@ -123,7 +143,9 @@ function ProfileMenu({
       .filter(Boolean)
       .slice(0, 2)
       .map((part) => part[0]?.toUpperCase())
-      .join('') || user?.email?.[0]?.toUpperCase() || 'U';
+      .join('') ||
+    user?.email?.[0]?.toUpperCase() ||
+    'U';
   const closeProfileMenu = () => {
     setProfileAnchor(null);
     onNavigate?.();
@@ -139,9 +161,7 @@ function ProfileMenu({
       }
       closeProfileMenu();
     } catch (error) {
-      setSignOutError(
-        error instanceof Error ? error.message : 'Could not sign out.',
-      );
+      setSignOutError(error instanceof Error ? error.message : 'Could not sign out.');
     } finally {
       setIsSigningOut(false);
     }
@@ -273,7 +293,7 @@ function ProfileMenu({
           <ListItemIcon>
             <AccountCircleOutlinedIcon fontSize="small" />
           </ListItemIcon>
-          Account
+          Settings
         </MenuItem>
         <MenuItem
           onClick={() => void signOut()}
@@ -321,19 +341,26 @@ function SidebarContents({
   showAccount?: boolean;
 }) {
   const wmsUser = useWmsAccess();
-  const visibleNavigation = navigation.filter((item) => {
-    if (item.to === '/users' || item.to === '/audit-history') {
-      return wmsUser.role === 'Admin';
-    }
-    if (
-      ['/receiving', '/inventory-adjustments', '/warehouse-transfers'].includes(
-        item.to,
-      )
-    ) {
-      return wmsUser.role !== 'Viewer';
-    }
-    return true;
-  });
+  const [openGroups, setOpenGroups] = useState<string[]>([navigationGroups[0].label]);
+  const location = useLocation();
+  const visibleGroups = navigationGroups
+    .map((group) => ({
+      ...group,
+      items: group.items.filter((item) => {
+        if (item.to === '/users') {
+          return wmsUser.role === 'Admin';
+        }
+        if (['/receiving', '/inventory-adjustments', '/warehouse-transfers'].includes(item.to)) {
+          return wmsUser.role !== 'Viewer';
+        }
+        return true;
+      }),
+    }))
+    .filter((group) => group.items.length > 0);
+  const toggleGroup = (label: string) =>
+    setOpenGroups((current) =>
+      current.includes(label) ? current.filter((l) => l !== label) : [...current, label],
+    );
 
   return (
     <Box
@@ -423,9 +450,7 @@ function SidebarContents({
             }}
           />
         )}
-        {!collapsed && (
-          <Box sx={{ flexGrow: 1 }} />
-        )}
+        {!collapsed && <Box sx={{ flexGrow: 1 }} />}
         {onToggle && !collapsed && (
           <IconButton
             size="small"
@@ -459,62 +484,131 @@ function SidebarContents({
             alignContent: 'start',
           }}
         >
-          {visibleNavigation.map((item) => (
-            <Tooltip
-              key={item.to}
-              title={collapsed ? item.label : ''}
-              placement="right"
-            >
-              <ListItemButton
-                component={NavLink}
-                to={item.to}
-                end={item.to === '/'}
-                onClick={onNavigate}
-                aria-label={collapsed ? item.label : undefined}
-                sx={{
-                  width: collapsed ? 48 : '100%',
-                  maxWidth: collapsed ? 48 : 'none',
-                  minWidth: 0,
-                  minHeight: collapsed ? 48 : 44,
-                  mx: 'auto',
-                  justifyContent: collapsed ? 'center' : 'flex-start',
-                  px: collapsed ? 0 : '6px',
-                  borderRadius: 1,
-                  color: 'text.secondary',
-                  transition: 'background-color 160ms ease, color 160ms ease',
-                  '& .MuiListItemIcon-root': {
-                    color: 'primary.main',
-                    minWidth: collapsed ? 0 : 38,
-                    width: collapsed ? 'auto' : 38,
-                    flexShrink: 0,
-                    justifyContent: 'center',
-                    '& .MuiSvgIcon-root': { fontSize: 24 },
-                  },
-                  '&:hover': {
-                    bgcolor: 'action.hover',
-                    color: 'text.primary',
-                  },
-                  '&.active': {
-                    color: 'common.white',
-                    bgcolor: 'primary.main',
-                    fontWeight: 700,
-                    '& .MuiListItemIcon-root': { color: 'common.white' },
-                    '&:hover': { bgcolor: 'primary.light' },
-                  },
-                }}
-              >
-                <ListItemIcon>{item.icon}</ListItemIcon>
-                {!collapsed && (
-                  <ListItemText
-                    primary={item.label}
-                    slotProps={{
-                      primary: { variant: 'body2', sx: { fontWeight: 600 } },
+          {visibleGroups.map((group, index) => {
+            const isOpen =
+              openGroups.includes(group.label) ||
+              group.items.some((item) =>
+                item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to),
+              );
+            const renderItem = (item: NavItem) => (
+              <Tooltip key={item.to} title={collapsed ? item.label : ''} placement="right">
+                <ListItemButton
+                  component={NavLink}
+                  to={item.to}
+                  end={item.to === '/'}
+                  onClick={onNavigate}
+                  aria-label={collapsed ? item.label : undefined}
+                  sx={{
+                    width: collapsed ? 48 : '100%',
+                    maxWidth: collapsed ? 48 : 'none',
+                    minWidth: 0,
+                    minHeight: collapsed ? 48 : 44,
+                    mx: 'auto',
+                    justifyContent: collapsed ? 'center' : 'flex-start',
+                    px: collapsed ? 0 : '6px',
+                    borderRadius: 1,
+                    color: 'text.secondary',
+                    transition: 'background-color 160ms ease, color 160ms ease',
+                    '& .MuiListItemIcon-root': {
+                      color: 'primary.main',
+                      minWidth: collapsed ? 0 : 38,
+                      width: collapsed ? 'auto' : 38,
+                      flexShrink: 0,
+                      justifyContent: 'center',
+                      '& .MuiSvgIcon-root': { fontSize: 24 },
+                    },
+                    '&:hover': {
+                      bgcolor: 'action.hover',
+                      color: 'text.primary',
+                    },
+                    '&.active': {
+                      color: 'common.white',
+                      bgcolor: 'primary.main',
+                      fontWeight: 700,
+                      '& .MuiListItemIcon-root': { color: 'common.white' },
+                      '&:hover': { bgcolor: 'primary.light' },
+                    },
+                  }}
+                >
+                  <ListItemIcon>{item.icon}</ListItemIcon>
+                  {!collapsed && (
+                    <ListItemText
+                      primary={item.label}
+                      slotProps={{
+                        primary: { variant: 'body2', sx: { fontWeight: 600 } },
+                      }}
+                    />
+                  )}
+                </ListItemButton>
+              </Tooltip>
+            );
+            if (collapsed) {
+              return (
+                <Box key={group.label} sx={{ display: 'grid', gap: 0.5 }}>
+                  {index > 0 && <Divider sx={{ my: 0.5 }} />}
+                  {group.items.map(renderItem)}
+                </Box>
+              );
+            }
+            return (
+              <Box key={group.label}>
+                <ListItemButton
+                  onClick={() => toggleGroup(group.label)}
+                  aria-expanded={isOpen}
+                  sx={{
+                    borderRadius: 1.5,
+                    px: 1,
+                    py: 0.75,
+                    gap: 1.25,
+                    color: isOpen ? 'text.primary' : 'text.secondary',
+                    '&:hover': { bgcolor: 'action.hover', color: 'text.primary' },
+                  }}
+                >
+                  <Box
+                    sx={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: 1.5,
+                      display: 'grid',
+                      placeItems: 'center',
+                      flexShrink: 0,
+                      color: 'primary.main',
+                      bgcolor: (theme) => alpha(theme.palette.primary.main, isOpen ? 0.14 : 0.08),
+                      '& .MuiSvgIcon-root': { fontSize: 20 },
+                    }}
+                  >
+                    {group.icon}
+                  </Box>
+                  <Typography variant="body2" sx={{ flex: 1, fontWeight: 700 }}>
+                    {group.label}
+                  </Typography>
+                  <ExpandMoreIcon
+                    fontSize="small"
+                    sx={{
+                      color: 'text.disabled',
+                      transition: 'transform 160ms',
+                      transform: isOpen ? 'rotate(180deg)' : 'none',
                     }}
                   />
-                )}
-              </ListItemButton>
-            </Tooltip>
-          ))}
+                </ListItemButton>
+                <Collapse in={isOpen} timeout="auto" unmountOnExit>
+                  <Box
+                    sx={{
+                      display: 'grid',
+                      gap: 0.25,
+                      my: 0.5,
+                      ml: 2.5,
+                      pl: 1,
+                      borderLeft: 1,
+                      borderColor: 'divider',
+                    }}
+                  >
+                    {group.items.map(renderItem)}
+                  </Box>
+                </Collapse>
+              </Box>
+            );
+          })}
         </List>
       </Box>
       {showAccount && (
@@ -608,51 +702,48 @@ function AuthenticatedShell() {
           overflowY: 'auto',
         }}
       >
-            <AppBar
-              position="sticky"
-              color="inherit"
-              elevation={0}
-              sx={{
-                bgcolor: 'background.paper',
-                  backgroundImage: 'none',
-                  borderBottom: 1,
-                borderColor: 'divider',
-              }}
+        <AppBar
+          position="sticky"
+          color="inherit"
+          elevation={0}
+          sx={{
+            bgcolor: 'background.paper',
+            backgroundImage: 'none',
+            borderBottom: 1,
+            borderColor: 'divider',
+          }}
+        >
+          <Toolbar
+            sx={{
+              gap: 1,
+              minHeight: '72px !important',
+              px: { xs: 1, md: 3 },
+            }}
+          >
+            <IconButton
+              edge="start"
+              onClick={() => setMobileOpen(true)}
+              aria-label="Open navigation menu"
+              sx={{ display: { xs: 'inline-flex', md: 'none' } }}
             >
-              <Toolbar
-                sx={{
-                  gap: 1,
-                  minHeight: '72px !important',
-                  px: { xs: 1, md: 3 },
-                }}
-              >
-                <IconButton
-                  edge="start"
-                  onClick={() => setMobileOpen(true)}
-                  aria-label="Open navigation menu"
-                  sx={{ display: { xs: 'inline-flex', md: 'none' } }}
-                >
-                  <MenuIcon />
-                </IconButton>
-                <Typography
-                  variant="h6"
-                  sx={{ display: { xs: 'block', md: 'none' }, fontWeight: 800 }}
-                >
-                  WMS
-                </Typography>
-                <Typography
-                  variant="subtitle1"
-                  sx={{ display: { xs: 'none', md: 'block' }, fontWeight: 700 }}
-                >
-                  {role.replace(/([a-z])([A-Z])/g, '$1 $2')}
-                </Typography>
-                <Box sx={{ flexGrow: 1 }} />
-                <ProfileMenu compact />
-              </Toolbar>
-            </AppBar>
-            <AuthenticatedOutlet />
-          </Box>
-        </Box>
+              <MenuIcon />
+            </IconButton>
+            <Typography variant="h6" sx={{ display: { xs: 'block', md: 'none' }, fontWeight: 800 }}>
+              WMS
+            </Typography>
+            <Typography
+              variant="subtitle1"
+              sx={{ display: { xs: 'none', md: 'block' }, fontWeight: 700 }}
+            >
+              {role.replace(/([a-z])([A-Z])/g, '$1 $2')}
+            </Typography>
+            <Box sx={{ flexGrow: 1 }} />
+            <ProfileMenu compact />
+          </Toolbar>
+        </AppBar>
+        <AuthenticatedOutlet />
+      </Box>
+    </Box>
   );
 }
 
@@ -682,28 +773,23 @@ function WmsAccessGate() {
 
   if (userQuery.isError || !userQuery.data?.isActive) {
     const status =
-      typeof userQuery.error === 'object' &&
-      userQuery.error !== null &&
-      'status' in userQuery.error
+      typeof userQuery.error === 'object' && userQuery.error !== null && 'status' in userQuery.error
         ? userQuery.error.status
         : undefined;
     const message =
-      userQuery.error instanceof ApiError &&
-      userQuery.error.code === 'WMS_INVITATION_REQUIRED'
+      userQuery.error instanceof ApiError && userQuery.error.code === 'WMS_INVITATION_REQUIRED'
         ? 'Your account is signed in, but it has not been given access to this warehouse yet.'
-        : userQuery.error instanceof ApiError &&
-            userQuery.error.code === 'WMS_ACCESS_INACTIVE'
+        : userQuery.error instanceof ApiError && userQuery.error.code === 'WMS_ACCESS_INACTIVE'
           ? 'Your warehouse access has been turned off. Contact your warehouse administrator if you think this is a mistake.'
           : status === 401
-        ? 'Your sign-in has expired. Sign in again to continue.'
-        : status === 403 || !userQuery.data?.isActive
-          ? 'Your warehouse access is unavailable. Contact your warehouse administrator.'
-          : userQuery.error instanceof Error
-            ? userQuery.error.message
-            : 'We could not check your warehouse access right now.';
+            ? 'Your sign-in has expired. Sign in again to continue.'
+            : status === 403 || !userQuery.data?.isActive
+              ? 'Your warehouse access is unavailable. Contact your warehouse administrator.'
+              : userQuery.error instanceof Error
+                ? userQuery.error.message
+                : 'We could not check your warehouse access right now.';
     const needsInvitation =
-      userQuery.error instanceof ApiError &&
-      userQuery.error.code === 'WMS_INVITATION_REQUIRED';
+      userQuery.error instanceof ApiError && userQuery.error.code === 'WMS_INVITATION_REQUIRED';
     const signOut = async () => {
       setIsSigningOut(true);
       setSignOutError(undefined);
@@ -713,9 +799,7 @@ function WmsAccessGate() {
           setSignOutError(result.error.message || 'Could not sign out.');
         }
       } catch (error) {
-        setSignOutError(
-          error instanceof Error ? error.message : 'Could not sign out.',
-        );
+        setSignOutError(error instanceof Error ? error.message : 'Could not sign out.');
       } finally {
         setIsSigningOut(false);
       }
@@ -732,10 +816,7 @@ function WmsAccessGate() {
           py: { xs: 3, md: 5 },
         }}
       >
-        <Paper
-          variant="outlined"
-          sx={{ width: '100%', maxWidth: 560, p: { xs: 3, sm: 4 } }}
-        >
+        <Paper variant="outlined" sx={{ width: '100%', maxWidth: 560, p: { xs: 3, sm: 4 } }}>
           <Stack spacing={2.5}>
             <Box
               sx={{
@@ -745,9 +826,7 @@ function WmsAccessGate() {
                 placeItems: 'center',
                 borderRadius: '50%',
                 color: needsInvitation ? 'error.main' : 'primary.main',
-                bgcolor: needsInvitation
-                  ? 'rgba(211, 47, 47, 0.12)'
-                  : 'action.hover',
+                bgcolor: needsInvitation ? 'rgba(211, 47, 47, 0.12)' : 'action.hover',
               }}
             >
               {needsInvitation ? (
@@ -768,18 +847,15 @@ function WmsAccessGate() {
               {message}
               {needsInvitation && (
                 <>
-                  {' '}If you have an invitation, create an account with the same email
-                  address and complete email verification. Contact your WMS Admin if you
-                  still cannot access the workspace.
+                  {' '}
+                  If you have an invitation, create an account with the same email address and
+                  complete email verification. Contact your WMS Admin if you still cannot access the
+                  workspace.
                 </>
               )}
             </Alert>
             {signOutError && <Alert severity="error">{signOutError}</Alert>}
-            <Button
-              variant="outlined"
-              onClick={() => void signOut()}
-              disabled={isSigningOut}
-            >
+            <Button variant="outlined" onClick={() => void signOut()} disabled={isSigningOut}>
               {isSigningOut ? 'Signing out…' : 'Sign out'}
             </Button>
           </Stack>

@@ -161,13 +161,7 @@ export function Products() {
     },
   });
   const updateMutation = useMutation({
-    mutationFn: async ({
-      id,
-      request,
-    }: {
-      id: string;
-      request: ProductRequest;
-    }) => {
+    mutationFn: async ({ id, request }: { id: string; request: ProductRequest }) => {
       const updated = await updateProduct(id, request);
       if (!updated) {
         throw new Error('The API returned no product after the update.');
@@ -241,9 +235,7 @@ export function Products() {
     setFormValues((current) => ({ ...current, [field]: value }));
     setFormErrors((current) => {
       const next = { ...current };
-      const errorKey = Object.keys(next).find(
-        (key) => key.toLowerCase() === field.toLowerCase(),
-      );
+      const errorKey = Object.keys(next).find((key) => key.toLowerCase() === field.toLowerCase());
       if (errorKey) {
         delete next[errorKey];
       }
@@ -269,9 +261,7 @@ export function Products() {
       Math.round(minimumStockLevel * 1000) / 1000 !== minimumStockLevel
     ) {
       setFormErrors({
-        MinimumStockLevel: [
-          'Enter a non-negative value with no more than 3 decimal places.',
-        ],
+        MinimumStockLevel: ['Enter a non-negative value with no more than 3 decimal places.'],
       });
       return;
     }
@@ -310,9 +300,7 @@ export function Products() {
   };
 
   const fieldError = (field: string) =>
-    Object.entries(formErrors).find(
-      ([key]) => key.toLowerCase() === field.toLowerCase(),
-    )?.[1];
+    Object.entries(formErrors).find(([key]) => key.toLowerCase() === field.toLowerCase())?.[1];
   const minimumStockLevel = Number(formValues.minimumStockLevel);
   const minimumStockLevelIsValid =
     formValues.minimumStockLevel.trim().length > 0 &&
@@ -320,9 +308,7 @@ export function Products() {
     minimumStockLevel >= 0 &&
     minimumStockLevel <= maximumMinimumStockLevel &&
     Math.round(minimumStockLevel * 1000) / 1000 === minimumStockLevel;
-  const categoryIdIsValid = categoryIdPattern.test(
-    formValues.categoryId.trim(),
-  );
+  const categoryIdIsValid = categoryIdPattern.test(formValues.categoryId.trim());
   const isFormValid =
     formValues.sku.trim().length > 0 &&
     formValues.sku.trim().length <= 50 &&
@@ -338,514 +324,443 @@ export function Products() {
   return (
     <Box component="main" sx={{ py: { xs: 3, md: 5 } }}>
       <Box sx={{ maxWidth: 1320, mx: 'auto', px: { xs: 2, sm: 3 } }}>
-              <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                spacing={2}
-                sx={{
-                  mb: 3,
-                  alignItems: { xs: 'stretch', sm: 'center' },
-                  justifyContent: 'space-between',
-                }}
-              >
-                <Box>
-                  <Typography
-                    variant="overline"
-                    color="primary"
-                    sx={{ fontWeight: 700, letterSpacing: 1.2 }}
-                  >
-                    CATALOG
-                  </Typography>
-                  <Typography
-                    variant="h4"
-                    component="h1"
-                    sx={{ fontWeight: 700 }}
-                  >
-                    Products
-                  </Typography>
-                  <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-                    Manage product details, stock thresholds, and status.
-                  </Typography>
-                </Box>
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={openCreateForm}
-                  disabled={!canManage}
-                  sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}
-                >
-                  Add product
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={2}
+          sx={{
+            mb: 3,
+            alignItems: { xs: 'stretch', sm: 'center' },
+            justifyContent: 'space-between',
+          }}
+        >
+          <Box>
+            <Typography
+              variant="overline"
+              color="primary"
+              sx={{ fontWeight: 700, letterSpacing: 1.2 }}
+            >
+              CATALOG
+            </Typography>
+            <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
+              Products
+            </Typography>
+            <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+              Manage product details, stock thresholds, and status.
+            </Typography>
+          </Box>
+          {canManage && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={openCreateForm}
+              sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}
+            >
+              Add product
+            </Button>
+          )}
+        </Stack>
+
+        {actionError && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {actionError}
+          </Alert>
+        )}
+
+        <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={2}
+            sx={{
+              p: 2.5,
+              alignItems: { xs: 'stretch', sm: 'center' },
+              justifyContent: 'space-between',
+            }}
+          >
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 650 }}>
+                All products
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {products.length} {products.length === 1 ? 'product' : 'products'}
+              </Typography>
+            </Box>
+            <TextField
+              size="small"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+              placeholder="Search SKU, name, barcode"
+              aria-label="Search products"
+              sx={{ width: { xs: '100%', sm: 320 } }}
+              slotProps={{
+                input: {
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon color="action" />
+                    </InputAdornment>
+                  ),
+                },
+              }}
+            />
+          </Stack>
+
+          {isLoading ? (
+            <Stack
+              spacing={2}
+              sx={{
+                py: 8,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}
+              role="status"
+            >
+              <CircularProgress size={30} />
+              <Typography color="text.secondary">Loading products…</Typography>
+            </Stack>
+          ) : productsLoadFailed ? (
+            <Stack spacing={2} sx={{ alignItems: 'center', p: 4 }}>
+              <Alert severity="error" sx={{ width: '100%' }}>
+                {errorMessage(loadError)}
+              </Alert>
+              <Button variant="outlined" onClick={() => void refetchProducts()}>
+                Retry
+              </Button>
+            </Stack>
+          ) : products.length === 0 ? (
+            <Stack spacing={1.5} sx={{ alignItems: 'center', py: 8, px: 2 }}>
+              <Inventory2OutlinedIcon color="action" sx={{ fontSize: 42 }} />
+              <Typography variant="h6" sx={{ fontWeight: 650 }}>
+                No products yet
+              </Typography>
+              <Typography color="text.secondary" sx={{ textAlign: 'center' }}>
+                Create your first product to start building the catalog.
+              </Typography>
+              {canManage && (
+                <Button variant="contained" startIcon={<AddIcon />} onClick={openCreateForm}>
+                  Add your first product
                 </Button>
-              </Stack>
-
-              {actionError && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  {actionError}
-                </Alert>
               )}
-
-              <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
-                <Stack
-                  direction={{ xs: 'column', sm: 'row' }}
-                  spacing={2}
-                  sx={{
-                    p: 2.5,
-                    alignItems: { xs: 'stretch', sm: 'center' },
-                    justifyContent: 'space-between',
-                  }}
-                >
-                  <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 650 }}>
-                      All products
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {products.length} {products.length === 1 ? 'product' : 'products'}
-                    </Typography>
-                  </Box>
-                  <TextField
-                    size="small"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
-                    placeholder="Search SKU, name, barcode"
-                    aria-label="Search products"
-                    sx={{ width: { xs: '100%', sm: 320 } }}
-                    slotProps={{
-                      input: {
-                        startAdornment: (
-                          <InputAdornment position="start">
-                            <SearchIcon color="action" />
-                          </InputAdornment>
-                        ),
-                      },
-                    }}
-                  />
-                </Stack>
-
-                {isLoading ? (
-                  <Stack
-                    spacing={2}
-                    sx={{
-                      py: 8,
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                    }}
-                    role="status"
-                  >
-                    <CircularProgress size={30} />
-                    <Typography color="text.secondary">
-                      Loading products…
-                    </Typography>
-                  </Stack>
-                ) : productsLoadFailed ? (
-                  <Stack
-                    spacing={2}
-                    sx={{ alignItems: 'center', p: 4 }}
-                  >
-                    <Alert severity="error" sx={{ width: '100%' }}>
-                      {errorMessage(loadError)}
-                    </Alert>
-                    <Button
-                      variant="outlined"
-                      onClick={() => void refetchProducts()}
-                    >
-                      Retry
-                    </Button>
-                  </Stack>
-                ) : products.length === 0 ? (
-                  <Stack
-                    spacing={1.5}
-                    sx={{ alignItems: 'center', py: 8, px: 2 }}
-                  >
-                    <Inventory2OutlinedIcon
-                      color="action"
-                      sx={{ fontSize: 42 }}
-                    />
-                    <Typography variant="h6" sx={{ fontWeight: 650 }}>
-                      No products yet
-                    </Typography>
-                    <Typography
-                      color="text.secondary"
-                      sx={{ textAlign: 'center' }}
-                    >
-                      Create your first product to start building the catalog.
-                    </Typography>
-                    <Button
-                      variant="contained"
-                      startIcon={<AddIcon />}
-                      onClick={openCreateForm}
-                      disabled={!canManage}
-                    >
-                      Add your first product
-                    </Button>
-                  </Stack>
-                ) : visibleProducts.length === 0 ? (
-                  <Typography
-                    color="text.secondary"
-                    sx={{ py: 6, px: 2, textAlign: 'center' }}
-                  >
-                    No products match “{search}”.
-                  </Typography>
-                ) : (
-                  <TableContainer>
-                    <Table>
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Product</TableCell>
-                          <TableCell>SKU</TableCell>
-                          <TableCell>Category</TableCell>
-                          <TableCell>Minimum stock</TableCell>
-                          <TableCell>Status</TableCell>
-                          <TableCell align="right">Actions</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {visibleProducts.map((product) => (
-                          <TableRow hover key={product.id}>
-                            <TableCell>
-                              <Typography
-                                variant="body2"
-                                sx={{ fontWeight: 650 }}
-                              >
-                                {product.name}
-                              </Typography>
-                              <Typography
-                                variant="caption"
-                                color="text.secondary"
-                              >
-                                {product.barcode || 'No barcode'}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>{product.sku}</TableCell>
-                            <TableCell>
-                              <Tooltip title={product.categoryId}>
-                                <Typography
-                                  variant="body2"
-                                  noWrap
-                                  sx={{ maxWidth: 150 }}
-                                >
-                                  {categoryNames.get(product.categoryId) ??
-                                    product.categoryId}
-                                </Typography>
-                              </Tooltip>
-                            </TableCell>
-                            <TableCell>
-                              <Typography variant="body2">
-                                {product.minimumStockLevel}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                Unit: {product.unit}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>
-                              <Chip
+            </Stack>
+          ) : visibleProducts.length === 0 ? (
+            <Typography color="text.secondary" sx={{ py: 6, px: 2, textAlign: 'center' }}>
+              No products match “{search}”.
+            </Typography>
+          ) : (
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Product</TableCell>
+                    <TableCell>SKU</TableCell>
+                    <TableCell>Category</TableCell>
+                    <TableCell>Minimum stock</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {visibleProducts.map((product) => (
+                    <TableRow hover key={product.id}>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 650 }}>
+                          {product.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {product.barcode || 'No barcode'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>{product.sku}</TableCell>
+                      <TableCell>
+                        <Tooltip title={product.categoryId}>
+                          <Typography variant="body2" noWrap sx={{ maxWidth: 150 }}>
+                            {categoryNames.get(product.categoryId) ?? product.categoryId}
+                          </Typography>
+                        </Tooltip>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2">{product.minimumStockLevel}</Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          Unit: {product.unit}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip
+                          size="small"
+                          color={product.isActive ? 'success' : 'default'}
+                          label={product.isActive ? 'Active' : 'Inactive'}
+                        />
+                      </TableCell>
+                      <TableCell align="right">
+                        <Stack direction="row" sx={{ gap: 0.5, justifyContent: 'flex-end' }}>
+                          {canManage && (
+                            <Tooltip title="Edit product">
+                              <IconButton
+                                aria-label={`Edit ${product.name}`}
+                                onClick={() => openEditForm(product)}
                                 size="small"
-                                color={product.isActive ? 'success' : 'default'}
-                                label={product.isActive ? 'Active' : 'Inactive'}
-                              />
-                            </TableCell>
-                            <TableCell align="right">
-                              <Stack
-                                direction="row"
-                                sx={{ gap: 0.5, justifyContent: 'flex-end' }}
                               >
-                                <Tooltip title="Edit product">
-                                  <IconButton
-                                    aria-label={`Edit ${product.name}`}
-                                    onClick={() => openEditForm(product)}
-                                    disabled={!canManage}
-                                    size="small"
-                                  >
-                                    <EditOutlinedIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Delete product">
-                                  <IconButton
-                                    aria-label={`Delete ${product.name}`}
-                                    color="error"
-                                    onClick={() => setDeletingProduct(product)}
-                                    size="small"
-                                    disabled={!canManage}
-                                  >
-                                    <DeleteOutlineIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                                <BarcodeLabelButton
-                                  title={product.name}
-                                  subtitle={`SKU: ${product.sku}`}
-                                  barcode={product.barcode}
-                                />
-                              </Stack>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                )}
-              </Paper>
-
+                                <EditOutlinedIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          {canManage && (
+                            <Tooltip title="Delete product">
+                              <IconButton
+                                aria-label={`Delete ${product.name}`}
+                                color="error"
+                                onClick={() => setDeletingProduct(product)}
+                                size="small"
+                              >
+                                <DeleteOutlineIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          )}
+                          <BarcodeLabelButton
+                            title={product.name}
+                            subtitle={`SKU: ${product.sku}`}
+                            barcode={product.barcode}
+                          />
+                        </Stack>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Paper>
       </Box>
 
-        <Dialog
-          open={Boolean(formMode)}
-          onClose={() => !isSaving && setFormMode(undefined)}
-          fullWidth
-          maxWidth="sm"
-        >
-          <Box component="form" onSubmit={submitForm}>
-            <DialogTitleWithClose
-              onClose={() => !isSaving && setFormMode(undefined)}
-              disabled={isSaving}
-            >
-              {formMode?.type === 'create' ? 'Add product' : 'Edit product'}
-            </DialogTitleWithClose>
-            <DialogContent>
-              <Stack spacing={2} sx={{ pt: 1 }}>
-                {actionError && <Alert severity="error">{actionError}</Alert>}
-                <TextField
-                  required
-                  fullWidth
-                  label="SKU"
-                  value={formValues.sku}
-                  onChange={(event) => updateField('sku', event.target.value)}
-                  slotProps={{ htmlInput: { maxLength: 50 } }}
-                  error={Boolean(fieldError('SKU'))}
-                  helperText={fieldError('SKU')?.join(' ')}
-                />
-                <TextField
-                  required
-                  fullWidth
-                  label="Product name"
-                  value={formValues.name}
-                  onChange={(event) => updateField('name', event.target.value)}
-                  slotProps={{ htmlInput: { maxLength: 200 } }}
-                  error={Boolean(fieldError('Name'))}
-                  helperText={fieldError('Name')?.join(' ')}
-                />
-                {categoryLoadFailed ? (
-                  <>
-                    <Alert
-                      severity="warning"
-                      action={
-                        <Button
-                          color="inherit"
-                          size="small"
-                          onClick={() => void refetchCategories()}
-                        >
-                          Retry
-                        </Button>
-                      }
-                    >
-                      Categories could not be loaded. Enter an existing Category
-                      ID manually or retry.
-                    </Alert>
-                    <TextField
-                      required
-                      fullWidth
-                      label="Category ID"
-                      placeholder="Existing Category UUID"
-                      value={formValues.categoryId}
-                      onChange={(event) =>
-                        updateField('categoryId', event.target.value)
-                      }
-                      slotProps={{ htmlInput: { maxLength: 36 } }}
-                      error={Boolean(fieldError('CategoryId'))}
-                      helperText={
-                        fieldError('CategoryId')?.join(' ') ??
-                        (formValues.categoryId.trim() && !categoryIdIsValid
-                          ? 'Enter a valid Category UUID.'
-                          : undefined)
-                      }
-                    />
-                  </>
-                ) : (
-                  <FormControl
-                    required
-                    fullWidth
-                    error={Boolean(fieldError('CategoryId'))}
-                    disabled={isCategoriesLoading || categories.length === 0}
-                  >
-                    <InputLabel id="product-category-label">Category</InputLabel>
-                    <Select
-                      labelId="product-category-label"
-                      label="Category"
-                      value={formValues.categoryId}
-                      onChange={(event) =>
-                        updateField('categoryId', event.target.value)
-                      }
-                    >
-                      {categories.map((category) => (
-                        <MenuItem key={category.id} value={category.id}>
-                          {category.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                    <FormHelperText>
-                      {fieldError('CategoryId')?.join(' ') ??
-                        (isCategoriesLoading
-                          ? 'Loading categories…'
-                          : categories.length === 0
-                            ? 'No categories are available. Create a category before adding products.'
-                            : 'Select the product category.')}
-                    </FormHelperText>
-                  </FormControl>
-                )}
-                <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                  <TextField
-                    required
-                    fullWidth
-                    label="Unit"
-                    value={formValues.unit}
-                    onChange={(event) => updateField('unit', event.target.value)}
-                    slotProps={{ htmlInput: { maxLength: 50 } }}
-                    error={Boolean(fieldError('Unit'))}
-                    helperText={fieldError('Unit')?.join(' ')}
-                  />
-                  <TextField
-                    required
-                    fullWidth
-                    type="number"
-                    label="Minimum stock level"
-                    value={formValues.minimumStockLevel}
-                    onChange={(event) =>
-                      updateField('minimumStockLevel', event.target.value)
-                    }
-                    slotProps={{
-                      htmlInput: {
-                        min: 0,
-                        max: maximumMinimumStockLevel,
-                        step: 0.001,
-                      },
-                    }}
-                    error={
-                      Boolean(fieldError('MinimumStockLevel')) ||
-                      Boolean(
-                        formValues.minimumStockLevel &&
-                          !minimumStockLevelIsValid,
-                      )
-                    }
-                    helperText={
-                      fieldError('MinimumStockLevel')?.join(' ') ??
-                      (formValues.minimumStockLevel &&
-                      !minimumStockLevelIsValid
-                        ? 'Enter a non-negative value with no more than 3 decimal places.'
-                        : 'Required; must be non-negative, up to 3 decimal places.')
-                    }
-                  />
-                </Stack>
-                <Stack spacing={0.75}>
-                  <TextField
-                    fullWidth
-                    label="Barcode (optional)"
-                    value={formValues.barcode}
-                    onChange={(event) => updateField('barcode', event.target.value)}
-                    slotProps={{ htmlInput: { maxLength: 100 } }}
-                    error={Boolean(fieldError('Barcode'))}
-                    helperText={
-                      fieldError('Barcode')?.join(' ') ??
-                      'Unique internal Code 128 value. Generated codes are not GS1 registered.'
-                    }
-                  />
-                  <Button
-                    size="small"
-                    sx={{ alignSelf: 'flex-start' }}
-                    onClick={() => updateField('barcode', generateInternalBarcode('product'))}
-                  >
-                    Generate internal barcode
-                  </Button>
-                </Stack>
-                <TextField
-                  fullWidth
-                  multiline
-                  minRows={2}
-                  label="Description"
-                  value={formValues.description}
-                  onChange={(event) =>
-                    updateField('description', event.target.value)
-                  }
-                  slotProps={{ htmlInput: { maxLength: 1000 } }}
-                  error={Boolean(fieldError('Description'))}
-                  helperText={fieldError('Description')?.join(' ')}
-                />
-                <Box>
-                  <Chip
-                    label={formValues.isActive ? 'Active' : 'Inactive'}
-                    color={formValues.isActive ? 'success' : 'default'}
-                    onClick={() =>
-                      updateField('isActive', !formValues.isActive)
-                    }
-                    aria-pressed={formValues.isActive}
-                  />
-                </Box>
-              </Stack>
-            </DialogContent>
-            <DialogActions sx={{ p: 2 }}>
-              <Button
-                onClick={() => setFormMode(undefined)}
-                disabled={isSaving}
-              >
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                variant="contained"
-                disabled={!canManage || isSaving || !isFormValid}
-                startIcon={
-                  isSaving ? <CircularProgress size={16} color="inherit" /> : null
-                }
-              >
-                {isSaving
-                  ? 'Saving…'
-                  : formMode?.type === 'create'
-                    ? 'Create product'
-                    : 'Save changes'}
-              </Button>
-            </DialogActions>
-          </Box>
-        </Dialog>
-
-        <Dialog
-          open={canManage && Boolean(deletingProduct)}
-          onClose={() => !isDeleting && setDeletingProduct(undefined)}
-          maxWidth="xs"
-          fullWidth
-        >
+      <Dialog
+        open={Boolean(formMode)}
+        onClose={() => !isSaving && setFormMode(undefined)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <Box component="form" onSubmit={submitForm}>
           <DialogTitleWithClose
-            onClose={() => !isDeleting && setDeletingProduct(undefined)}
-            disabled={!canManage || isDeleting}
+            onClose={() => !isSaving && setFormMode(undefined)}
+            disabled={isSaving}
           >
-            Delete product?
+            {formMode?.type === 'create' ? 'Add product' : 'Edit product'}
           </DialogTitleWithClose>
           <DialogContent>
-            <Typography color="text.secondary">
-              Delete {deletingProduct?.name} ({deletingProduct?.sku})? This action
-              cannot be undone.
-            </Typography>
-            {actionError && (
-              <Alert severity="error" sx={{ mt: 2 }}>
-                {actionError}
-              </Alert>
-            )}
+            <Stack spacing={2} sx={{ pt: 1 }}>
+              {actionError && <Alert severity="error">{actionError}</Alert>}
+              <TextField
+                required
+                fullWidth
+                label="SKU"
+                value={formValues.sku}
+                onChange={(event) => updateField('sku', event.target.value)}
+                slotProps={{ htmlInput: { maxLength: 50 } }}
+                error={Boolean(fieldError('SKU'))}
+                helperText={fieldError('SKU')?.join(' ')}
+              />
+              <TextField
+                required
+                fullWidth
+                label="Product name"
+                value={formValues.name}
+                onChange={(event) => updateField('name', event.target.value)}
+                slotProps={{ htmlInput: { maxLength: 200 } }}
+                error={Boolean(fieldError('Name'))}
+                helperText={fieldError('Name')?.join(' ')}
+              />
+              {categoryLoadFailed ? (
+                <>
+                  <Alert
+                    severity="warning"
+                    action={
+                      <Button color="inherit" size="small" onClick={() => void refetchCategories()}>
+                        Retry
+                      </Button>
+                    }
+                  >
+                    Categories could not be loaded. Enter an existing Category ID manually or retry.
+                  </Alert>
+                  <TextField
+                    required
+                    fullWidth
+                    label="Category ID"
+                    placeholder="Existing Category UUID"
+                    value={formValues.categoryId}
+                    onChange={(event) => updateField('categoryId', event.target.value)}
+                    slotProps={{ htmlInput: { maxLength: 36 } }}
+                    error={Boolean(fieldError('CategoryId'))}
+                    helperText={
+                      fieldError('CategoryId')?.join(' ') ??
+                      (formValues.categoryId.trim() && !categoryIdIsValid
+                        ? 'Enter a valid Category UUID.'
+                        : undefined)
+                    }
+                  />
+                </>
+              ) : (
+                <FormControl
+                  required
+                  fullWidth
+                  error={Boolean(fieldError('CategoryId'))}
+                  disabled={isCategoriesLoading || categories.length === 0}
+                >
+                  <InputLabel id="product-category-label">Category</InputLabel>
+                  <Select
+                    labelId="product-category-label"
+                    label="Category"
+                    value={formValues.categoryId}
+                    onChange={(event) => updateField('categoryId', event.target.value)}
+                  >
+                    {categories.map((category) => (
+                      <MenuItem key={category.id} value={category.id}>
+                        {category.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  <FormHelperText>
+                    {fieldError('CategoryId')?.join(' ') ??
+                      (isCategoriesLoading
+                        ? 'Loading categories…'
+                        : categories.length === 0
+                          ? 'No categories are available. Create a category before adding products.'
+                          : 'Select the product category.')}
+                  </FormHelperText>
+                </FormControl>
+              )}
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                <TextField
+                  required
+                  fullWidth
+                  label="Unit"
+                  value={formValues.unit}
+                  onChange={(event) => updateField('unit', event.target.value)}
+                  slotProps={{ htmlInput: { maxLength: 50 } }}
+                  error={Boolean(fieldError('Unit'))}
+                  helperText={fieldError('Unit')?.join(' ')}
+                />
+                <TextField
+                  required
+                  fullWidth
+                  type="number"
+                  label="Minimum stock level"
+                  value={formValues.minimumStockLevel}
+                  onChange={(event) => updateField('minimumStockLevel', event.target.value)}
+                  slotProps={{
+                    htmlInput: {
+                      min: 0,
+                      max: maximumMinimumStockLevel,
+                      step: 0.001,
+                    },
+                  }}
+                  error={
+                    Boolean(fieldError('MinimumStockLevel')) ||
+                    Boolean(formValues.minimumStockLevel && !minimumStockLevelIsValid)
+                  }
+                  helperText={
+                    fieldError('MinimumStockLevel')?.join(' ') ??
+                    (formValues.minimumStockLevel && !minimumStockLevelIsValid
+                      ? 'Enter a non-negative value with no more than 3 decimal places.'
+                      : 'Required; must be non-negative, up to 3 decimal places.')
+                  }
+                />
+              </Stack>
+              <Stack spacing={0.75}>
+                <TextField
+                  fullWidth
+                  label="Barcode (optional)"
+                  value={formValues.barcode}
+                  onChange={(event) => updateField('barcode', event.target.value)}
+                  slotProps={{ htmlInput: { maxLength: 100 } }}
+                  error={Boolean(fieldError('Barcode'))}
+                  helperText={
+                    fieldError('Barcode')?.join(' ') ??
+                    'Unique internal Code 128 value. Generated codes are not GS1 registered.'
+                  }
+                />
+                <Button
+                  size="small"
+                  sx={{ alignSelf: 'flex-start' }}
+                  onClick={() => updateField('barcode', generateInternalBarcode('product'))}
+                >
+                  Generate internal barcode
+                </Button>
+              </Stack>
+              <TextField
+                fullWidth
+                multiline
+                minRows={2}
+                label="Description"
+                value={formValues.description}
+                onChange={(event) => updateField('description', event.target.value)}
+                slotProps={{ htmlInput: { maxLength: 1000 } }}
+                error={Boolean(fieldError('Description'))}
+                helperText={fieldError('Description')?.join(' ')}
+              />
+              <Box>
+                <Chip
+                  label={formValues.isActive ? 'Active' : 'Inactive'}
+                  color={formValues.isActive ? 'success' : 'default'}
+                  onClick={() => updateField('isActive', !formValues.isActive)}
+                  aria-pressed={formValues.isActive}
+                />
+              </Box>
+            </Stack>
           </DialogContent>
           <DialogActions sx={{ p: 2 }}>
-            <Button
-              onClick={() => setDeletingProduct(undefined)}
-              disabled={isDeleting}
-            >
+            <Button onClick={() => setFormMode(undefined)} disabled={isSaving}>
               Cancel
             </Button>
             <Button
-              color="error"
+              type="submit"
               variant="contained"
-              onClick={() => void removeProduct()}
-              disabled={!canManage || isDeleting}
-              startIcon={
-                isDeleting ? <CircularProgress size={16} color="inherit" /> : null
-              }
+              disabled={!canManage || isSaving || !isFormValid}
+              startIcon={isSaving ? <CircularProgress size={16} color="inherit" /> : null}
             >
-              {isDeleting ? 'Deleting…' : 'Delete'}
+              {isSaving
+                ? 'Saving…'
+                : formMode?.type === 'create'
+                  ? 'Create product'
+                  : 'Save changes'}
             </Button>
           </DialogActions>
-        </Dialog>
+        </Box>
+      </Dialog>
+
+      <Dialog
+        open={canManage && Boolean(deletingProduct)}
+        onClose={() => !isDeleting && setDeletingProduct(undefined)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitleWithClose
+          onClose={() => !isDeleting && setDeletingProduct(undefined)}
+          disabled={!canManage || isDeleting}
+        >
+          Delete product?
+        </DialogTitleWithClose>
+        <DialogContent>
+          <Typography color="text.secondary">
+            Delete {deletingProduct?.name} ({deletingProduct?.sku})? This action cannot be undone.
+          </Typography>
+          {actionError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {actionError}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setDeletingProduct(undefined)} disabled={isDeleting}>
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => void removeProduct()}
+            disabled={!canManage || isDeleting}
+            startIcon={isDeleting ? <CircularProgress size={16} color="inherit" /> : null}
+          >
+            {isDeleting ? 'Deleting…' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

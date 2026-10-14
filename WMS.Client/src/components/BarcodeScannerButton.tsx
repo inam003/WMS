@@ -42,6 +42,8 @@ interface BarcodeScannerButtonProps {
   label?: string;
   size?: 'small' | 'medium';
   startIcon?: ReactNode;
+  variant?: 'text' | 'outlined';
+  fullHeight?: boolean;
 }
 
 export function BarcodeScannerButton({
@@ -50,6 +52,8 @@ export function BarcodeScannerButton({
   label = 'Scan barcode',
   size = 'small',
   startIcon = <QrCodeScannerOutlinedIcon />,
+  variant = 'text',
+  fullHeight = false,
 }: BarcodeScannerButtonProps) {
   const [open, setOpen] = useState(false);
   const [barcode, setBarcode] = useState('');
@@ -198,12 +202,19 @@ export function BarcodeScannerButton({
 
   const submitManual = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    event.stopPropagation();
     void lookup(barcode);
   };
 
   return (
     <>
-      <Button size={size} startIcon={startIcon} onClick={() => setOpen(true)}>
+      <Button
+        size={size}
+        variant={variant}
+        startIcon={startIcon}
+        onClick={() => setOpen(true)}
+        sx={fullHeight ? { height: 56, flexShrink: 0, whiteSpace: 'nowrap' } : undefined}
+      >
         {label}
       </Button>
       <Dialog
@@ -221,7 +232,7 @@ export function BarcodeScannerButton({
             <Box
               component="form"
               onSubmit={submitManual}
-              sx={{ display: 'flex', gap: 1, alignItems: 'flex-start' }}
+              sx={{ display: 'flex', gap: 1, alignItems: 'stretch' }}
             >
               <TextField
                 autoFocus
@@ -240,7 +251,7 @@ export function BarcodeScannerButton({
                   }
                 }}
               />
-              <Button type="submit" variant="contained" disabled={busy || !barcode.trim()}>
+              <Button type="submit" variant="contained" sx={{ minWidth: 88 }} disabled={busy || !barcode.trim()}>
                 {busy ? <CircularProgress size={20} color="inherit" /> : 'Find'}
               </Button>
             </Box>

@@ -187,7 +187,7 @@ public sealed class InventoryController(IInventoryService inventoryService) : Co
             InventoryError.InsufficientInventory => Conflict(new ProblemDetails
             {
                 Status = StatusCodes.Status409Conflict,
-                Title = "The inventory movement would reduce stock below zero."
+                Title = "Not enough stock at this location. The quantity you entered is more than what is currently available."
             }),
             InventoryError.OrderNotReady => Conflict(new ProblemDetails
             {

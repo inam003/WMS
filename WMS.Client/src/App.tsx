@@ -1,6 +1,6 @@
 import { Box, Button } from '@mui/material';
 import { ToastAlert as Alert } from './components/ToastProvider';
-import { Link as RouterLink, Route, Routes } from 'react-router-dom';
+import { Link as RouterLink, Navigate, Route, Routes } from 'react-router-dom';
 import type { ReactNode } from 'react';
 import { Account } from './pages/account';
 import { Auth } from './pages/auth';
@@ -18,7 +18,6 @@ import { Receiving } from './pages/receiving';
 import { Warehouses } from './pages/warehouses';
 import { WarehouseTransfers } from './pages/warehouse-transfers';
 import { Users } from './pages/users';
-import { AuditHistory } from './pages/audit-history';
 import { AcceptInvitation } from './pages/accept-invitation';
 import { Welcome } from './pages/welcome';
 import { useWmsAccess } from './hooks/useWmsAccess';
@@ -74,7 +73,7 @@ export default function App() {
         <Route path="/orders" element={<Orders />} />
         <Route path="/reports" element={<Reports />} />
         <Route path="/users" element={<RequireRoles allowedRoles={adminRoles}><Users /></RequireRoles>} />
-        <Route path="/audit-history" element={<RequireRoles allowedRoles={adminRoles}><AuditHistory /></RequireRoles>} />
+        <Route path="/audit-history" element={<Navigate to="/account/audit-history" replace />} />
         <Route
           path="/inventory-transactions"
           element={<InventoryTransactions />}

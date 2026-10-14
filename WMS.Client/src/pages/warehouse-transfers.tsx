@@ -17,12 +17,8 @@ import {
 import { ToastAlert as Alert } from '../components/ToastProvider';
 import SwapHorizOutlinedIcon from '@mui/icons-material/SwapHorizOutlined';
 import { BarcodeScannerButton } from '../components/BarcodeScannerButton';
-import {
-  getLocations,
-  getProducts,
-  getWarehouses,
-  transferInventory,
-} from '../lib/api';
+import { FormFooter, FormSection } from '../components/FormSection';
+import { getLocations, getProducts, getWarehouses, transferInventory } from '../lib/api';
 import type { InventoryTransferRequest } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
 
@@ -93,17 +89,14 @@ export function WarehouseTransfers() {
   const activeLocations = useMemo(
     () =>
       (locationsQuery.data ?? []).filter(
-        (location) =>
-          location.isActive && activeWarehouseIds.has(location.warehouseId),
+        (location) => location.isActive && activeWarehouseIds.has(location.warehouseId),
       ),
     [activeWarehouseIds, locationsQuery.data],
   );
   const sourceLocations = useMemo(
     () =>
       activeLocations.filter(
-        (location) =>
-          !form.sourceWarehouseId ||
-          location.warehouseId === form.sourceWarehouseId,
+        (location) => !form.sourceWarehouseId || location.warehouseId === form.sourceWarehouseId,
       ),
     [activeLocations, form.sourceWarehouseId],
   );
@@ -111,8 +104,7 @@ export function WarehouseTransfers() {
     () =>
       activeLocations.filter(
         (location) =>
-          !form.destinationWarehouseId ||
-          location.warehouseId === form.destinationWarehouseId,
+          !form.destinationWarehouseId || location.warehouseId === form.destinationWarehouseId,
       ),
     [activeLocations, form.destinationWarehouseId],
   );
@@ -122,15 +114,9 @@ export function WarehouseTransfers() {
     locationsQuery.isError ? locationsQuery.error : undefined,
   ].find((error) => error !== undefined);
   const isLoading =
-    productsQuery.isPending ||
-    warehousesQuery.isPending ||
-    locationsQuery.isPending;
+    productsQuery.isPending || warehousesQuery.isPending || locationsQuery.isPending;
   const retryOptions = () =>
-    Promise.all([
-      productsQuery.refetch(),
-      warehousesQuery.refetch(),
-      locationsQuery.refetch(),
-    ]);
+    Promise.all([productsQuery.refetch(), warehousesQuery.refetch(), locationsQuery.refetch()]);
   const quantity = Number(form.quantity);
   const isQuantityValid =
     form.quantity.trim().length > 0 &&
@@ -138,8 +124,7 @@ export function WarehouseTransfers() {
     quantity > 0 &&
     quantity < 1_000_000_000_000_000 &&
     Math.round(quantity * 1000) / 1000 === quantity;
-  const isReferenceValid =
-    !form.referenceId.trim() || isGuid(form.referenceId.trim());
+  const isReferenceValid = !form.referenceId.trim() || isGuid(form.referenceId.trim());
   const isTransferFormValid =
     !isLoading &&
     !optionsError &&
@@ -180,13 +165,9 @@ export function WarehouseTransfers() {
         }),
       ]);
       intentRef.current = undefined;
-      setForm((current) => ({ ...current, quantity: '', referenceId: '' }));
-      const outgoing = transactions.find(
-        (transaction) => transaction.type === 'TransferOut',
-      );
-      const incoming = transactions.find(
-        (transaction) => transaction.type === 'TransferIn',
-      );
+      setForm(emptyForm);
+      const outgoing = transactions.find((transaction) => transaction.type === 'TransferOut');
+      const incoming = transactions.find((transaction) => transaction.type === 'TransferIn');
       setSuccessMessage(
         outgoing && incoming
           ? `Transferred ${outgoing.quantity} ${outgoing.productName} from ${outgoing.warehouseName} / ${outgoing.locationName} to ${incoming.warehouseName} / ${incoming.locationName}.`
@@ -212,11 +193,7 @@ export function WarehouseTransfers() {
     if (submissionLock.current) return;
 
     const quantity = Number(form.quantity);
-    if (
-      !form.productId ||
-      !form.sourceLocationId ||
-      !form.destinationLocationId
-    ) {
+    if (!form.productId || !form.sourceLocationId || !form.destinationLocationId) {
       setFormError('Select a product, source location, and destination location.');
       return;
     }
@@ -286,11 +263,7 @@ export function WarehouseTransfers() {
             severity="warning"
             sx={{ mb: 2 }}
             action={
-              <Button
-                color="inherit"
-                size="small"
-                onClick={() => void retryOptions()}
-              >
+              <Button color="inherit" size="small" onClick={() => void retryOptions()}>
                 Retry
               </Button>
             }
@@ -305,8 +278,7 @@ export function WarehouseTransfers() {
         )}
         {transferMutation.isError && (
           <Alert severity="error" sx={{ mb: 2 }}>
-            Transfer failed: {errorMessage(transferMutation.error)}. Retrying the
-            same transfer reuses its idempotency key.
+            {errorMessage(transferMutation.error)}
           </Alert>
         )}
         {successMessage && (
@@ -315,223 +287,232 @@ export function WarehouseTransfers() {
           </Alert>
         )}
 
-        <Paper component="form" variant="outlined" onSubmit={submitTransfer}>
+        <Paper
+          component="form"
+          variant="outlined"
+          onSubmit={submitTransfer}
+          sx={{ overflow: 'hidden' }}
+        >
           {isLoading ? (
             <Stack spacing={2} sx={{ p: 5, alignItems: 'center' }} role="status">
               <CircularProgress size={30} />
-              <Typography color="text.secondary">
-                Loading transfer options…
-              </Typography>
+              <Typography color="text.secondary">Loading transfer options…</Typography>
             </Stack>
           ) : (
-            <Stack spacing={2.5} sx={{ p: { xs: 2, sm: 3 } }}>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { sm: 'center' } }}>
-                <FormControl fullWidth required>
-                  <InputLabel id="transfer-product-label">Product</InputLabel>
-                  <Select
-                    labelId="transfer-product-label"
-                    label="Product"
-                    value={form.productId}
-                    onChange={(event) => updateForm('productId', event.target.value)}
-                  >
-                    {products.map((product) => (
-                      <MenuItem key={product.id} value={product.id}>
-                        {product.name} ({product.sku})
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <BarcodeScannerButton
-                  target="product"
-                  onResolved={(entity) => {
-                    if ('sku' in entity) updateForm('productId', entity.id);
-                  }}
-                />
-              </Stack>
-              <Typography variant="subtitle1" sx={{ fontWeight: 650 }}>
-                Source
-              </Typography>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                <FormControl fullWidth required>
-                  <InputLabel id="transfer-source-warehouse-label">
-                    Source warehouse
-                  </InputLabel>
-                  <Select
-                    labelId="transfer-source-warehouse-label"
-                    label="Source warehouse"
-                    value={form.sourceWarehouseId}
-                    onChange={(event) => {
-                      setForm((current) => ({
-                        ...current,
-                        sourceWarehouseId: event.target.value,
-                        sourceLocationId: '',
-                      }));
-                      setFormError(undefined);
-                      setSuccessMessage(undefined);
-                    }}
-                  >
-                    {warehouses.map((warehouse) => (
-                      <MenuItem key={warehouse.id} value={warehouse.id}>
-                        {warehouse.name} ({warehouse.code})
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <FormControl
-                  fullWidth
-                  required
-                  disabled={!form.sourceWarehouseId}
+            <>
+              <FormSection
+                step={1}
+                title="Product"
+                description="Choose the product to move, or scan its barcode."
+              >
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={1.5}
+                  sx={{ alignItems: { sm: 'flex-start' } }}
                 >
-                  <InputLabel id="transfer-source-location-label">
-                    Source location
-                  </InputLabel>
-                  <Select
-                    labelId="transfer-source-location-label"
-                    label="Source location"
-                    value={form.sourceLocationId}
-                    onChange={(event) =>
-                      updateForm('sourceLocationId', event.target.value)
-                    }
-                  >
-                    {sourceLocations.map((location) => (
-                      <MenuItem
-                        key={location.id}
-                        value={location.id}
-                        disabled={location.id === form.destinationLocationId}
-                      >
-                        {location.name} ({location.code})
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <BarcodeScannerButton
-                  target="location"
-                  label="Scan source"
-                  onResolved={(entity) => {
-                    if ('warehouseId' in entity) {
-                      setForm((current) => ({
-                        ...current,
-                        sourceWarehouseId: entity.warehouseId,
-                        sourceLocationId: entity.id,
-                      }));
-                      setFormError(undefined);
-                      setSuccessMessage(undefined);
-                    }
-                  }}
-                />
-              </Stack>
-              <Typography variant="subtitle1" sx={{ fontWeight: 650 }}>
-                Destination
-              </Typography>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                <FormControl fullWidth required>
-                  <InputLabel id="transfer-destination-warehouse-label">
-                    Destination warehouse
-                  </InputLabel>
-                  <Select
-                    labelId="transfer-destination-warehouse-label"
-                    label="Destination warehouse"
-                    value={form.destinationWarehouseId}
-                    onChange={(event) => {
-                      setForm((current) => ({
-                        ...current,
-                        destinationWarehouseId: event.target.value,
-                        destinationLocationId: '',
-                      }));
-                      setFormError(undefined);
-                      setSuccessMessage(undefined);
+                  <FormControl fullWidth required>
+                    <InputLabel id="transfer-product-label">Product</InputLabel>
+                    <Select
+                      labelId="transfer-product-label"
+                      label="Product"
+                      value={form.productId}
+                      onChange={(event) => updateForm('productId', event.target.value)}
+                    >
+                      {products.map((product) => (
+                        <MenuItem key={product.id} value={product.id}>
+                          {product.name} ({product.sku})
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <BarcodeScannerButton
+                    target="product"
+                    variant="outlined"
+                    fullHeight
+                    label="Scan product"
+                    onResolved={(entity) => {
+                      if ('sku' in entity) updateForm('productId', entity.id);
                     }}
-                  >
-                    {warehouses.map((warehouse) => (
-                      <MenuItem key={warehouse.id} value={warehouse.id}>
-                        {warehouse.name} ({warehouse.code})
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <FormControl
-                  fullWidth
-                  required
-                  disabled={!form.destinationWarehouseId}
+                  />
+                </Stack>
+              </FormSection>
+              <FormSection step={2} title="Source" description="Where the stock is taken from.">
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={2}
+                  sx={{ alignItems: { sm: 'flex-start' } }}
                 >
-                  <InputLabel id="transfer-destination-location-label">
-                    Destination location
-                  </InputLabel>
-                  <Select
-                    labelId="transfer-destination-location-label"
-                    label="Destination location"
-                    value={form.destinationLocationId}
-                    onChange={(event) =>
-                      updateForm('destinationLocationId', event.target.value)
-                    }
-                  >
-                    {destinationLocations.map((location) => (
-                      <MenuItem
-                        key={location.id}
-                        value={location.id}
-                        disabled={location.id === form.sourceLocationId}
-                      >
-                        {location.name} ({location.code})
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <BarcodeScannerButton
-                  target="location"
-                  label="Scan destination"
-                  onResolved={(entity) => {
-                    if ('warehouseId' in entity) {
-                      setForm((current) => ({
-                        ...current,
-                        destinationWarehouseId: entity.warehouseId,
-                        destinationLocationId: entity.id,
-                      }));
-                      setFormError(undefined);
-                      setSuccessMessage(undefined);
-                    }
-                  }}
-                />
-              </Stack>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                <TextField
-                  fullWidth
-                  required
-                  type="number"
-                  label="Quantity"
-                  value={form.quantity}
-                  onChange={(event) => updateForm('quantity', event.target.value)}
-                  slotProps={{ htmlInput: { min: 0, step: '0.001' } }}
-                />
-                <TextField
-                  fullWidth
-                  label="Reference ID (optional)"
-                  value={form.referenceId}
-                  onChange={(event) =>
-                    updateForm('referenceId', event.target.value)
-                  }
-                  helperText="Optional external transfer reference (GUID)."
-                  error={!isReferenceValid}
-                />
-              </Stack>
-              {transferValidationMessage && (
-                <Typography color="text.secondary" variant="body2" role="status">
-                  {transferValidationMessage}
-                </Typography>
-              )}
-              <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
+                  <FormControl fullWidth required>
+                    <InputLabel id="transfer-source-warehouse-label">Source warehouse</InputLabel>
+                    <Select
+                      labelId="transfer-source-warehouse-label"
+                      label="Source warehouse"
+                      value={form.sourceWarehouseId}
+                      onChange={(event) => {
+                        setForm((current) => ({
+                          ...current,
+                          sourceWarehouseId: event.target.value,
+                          sourceLocationId: '',
+                        }));
+                        setFormError(undefined);
+                        setSuccessMessage(undefined);
+                      }}
+                    >
+                      {warehouses.map((warehouse) => (
+                        <MenuItem key={warehouse.id} value={warehouse.id}>
+                          {warehouse.name} ({warehouse.code})
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <FormControl fullWidth required disabled={!form.sourceWarehouseId}>
+                    <InputLabel id="transfer-source-location-label">Source location</InputLabel>
+                    <Select
+                      labelId="transfer-source-location-label"
+                      label="Source location"
+                      value={form.sourceLocationId}
+                      onChange={(event) => updateForm('sourceLocationId', event.target.value)}
+                    >
+                      {sourceLocations.map((location) => (
+                        <MenuItem
+                          key={location.id}
+                          value={location.id}
+                          disabled={location.id === form.destinationLocationId}
+                        >
+                          {location.name} ({location.code})
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <BarcodeScannerButton
+                    target="location"
+                    label="Scan source"
+                    variant="outlined"
+                    fullHeight
+                    onResolved={(entity) => {
+                      if ('warehouseId' in entity) {
+                        setForm((current) => ({
+                          ...current,
+                          sourceWarehouseId: entity.warehouseId,
+                          sourceLocationId: entity.id,
+                        }));
+                        setFormError(undefined);
+                        setSuccessMessage(undefined);
+                      }
+                    }}
+                  />
+                </Stack>
+              </FormSection>
+              <FormSection step={3} title="Destination" description="Where the stock is moved to.">
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={2}
+                  sx={{ alignItems: { sm: 'flex-start' } }}
+                >
+                  <FormControl fullWidth required>
+                    <InputLabel id="transfer-destination-warehouse-label">
+                      Destination warehouse
+                    </InputLabel>
+                    <Select
+                      labelId="transfer-destination-warehouse-label"
+                      label="Destination warehouse"
+                      value={form.destinationWarehouseId}
+                      onChange={(event) => {
+                        setForm((current) => ({
+                          ...current,
+                          destinationWarehouseId: event.target.value,
+                          destinationLocationId: '',
+                        }));
+                        setFormError(undefined);
+                        setSuccessMessage(undefined);
+                      }}
+                    >
+                      {warehouses.map((warehouse) => (
+                        <MenuItem key={warehouse.id} value={warehouse.id}>
+                          {warehouse.name} ({warehouse.code})
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <FormControl fullWidth required disabled={!form.destinationWarehouseId}>
+                    <InputLabel id="transfer-destination-location-label">
+                      Destination location
+                    </InputLabel>
+                    <Select
+                      labelId="transfer-destination-location-label"
+                      label="Destination location"
+                      value={form.destinationLocationId}
+                      onChange={(event) => updateForm('destinationLocationId', event.target.value)}
+                    >
+                      {destinationLocations.map((location) => (
+                        <MenuItem
+                          key={location.id}
+                          value={location.id}
+                          disabled={location.id === form.sourceLocationId}
+                        >
+                          {location.name} ({location.code})
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <BarcodeScannerButton
+                    target="location"
+                    label="Scan destination"
+                    variant="outlined"
+                    fullHeight
+                    onResolved={(entity) => {
+                      if ('warehouseId' in entity) {
+                        setForm((current) => ({
+                          ...current,
+                          destinationWarehouseId: entity.warehouseId,
+                          destinationLocationId: entity.id,
+                        }));
+                        setFormError(undefined);
+                        setSuccessMessage(undefined);
+                      }
+                    }}
+                  />
+                </Stack>
+              </FormSection>
+              <FormSection
+                step={4}
+                title="Quantity"
+                description="Enter how much to move and an optional reference."
+              >
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={2}
+                  sx={{ alignItems: { sm: 'flex-start' } }}
+                >
+                  <TextField
+                    fullWidth
+                    required
+                    type="number"
+                    label="Quantity"
+                    value={form.quantity}
+                    onChange={(event) => updateForm('quantity', event.target.value)}
+                    slotProps={{ htmlInput: { min: 0, step: '0.001' } }}
+                  />
+                  <TextField
+                    fullWidth
+                    label="Reference ID (optional)"
+                    value={form.referenceId}
+                    onChange={(event) => updateForm('referenceId', event.target.value)}
+                    helperText="Optional external transfer reference (GUID)."
+                    error={!isReferenceValid}
+                  />
+                </Stack>
+              </FormSection>
+              <FormFooter message={transferValidationMessage}>
                 <Button
                   type="submit"
                   variant="contained"
-                  disabled={
-                    !isTransferFormValid || transferMutation.isPending
-                  }
+                  disabled={!isTransferFormValid || transferMutation.isPending}
                 >
-                  {transferMutation.isPending
-                    ? 'Recording transfer…'
-                    : 'Transfer stock'}
+                  {transferMutation.isPending ? 'Recording transfer…' : 'Transfer stock'}
                 </Button>
-              </Stack>
-            </Stack>
+              </FormFooter>
+            </>
           )}
         </Paper>
       </Box>

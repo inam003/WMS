@@ -99,11 +99,8 @@ export function Locations() {
   });
   const isLoading = isLocationsLoading || isWarehousesLoading;
   const loadFailed = locationsLoadFailed || warehousesLoadFailed;
-  const loadError = locationsLoadFailed
-    ? locationsLoadError
-    : warehousesLoadError;
-  const retryLoad = () =>
-    Promise.all([refetchLocations(), refetchWarehouses()]);
+  const loadError = locationsLoadFailed ? locationsLoadError : warehousesLoadError;
+  const retryLoad = () => Promise.all([refetchLocations(), refetchWarehouses()]);
   const [actionError, setActionError] = useState<string>();
   const [formMode, setFormMode] = useState<FormMode>();
   const [formValues, setFormValues] = useState<LocationFormValues>(emptyForm);
@@ -131,13 +128,7 @@ export function Locations() {
     },
   });
   const updateMutation = useMutation({
-    mutationFn: async ({
-      id,
-      request,
-    }: {
-      id: string;
-      request: LocationRequest;
-    }) => {
+    mutationFn: async ({ id, request }: { id: string; request: LocationRequest }) => {
       const location = await updateLocation(id, request);
       if (!location) {
         throw new Error('The API returned no location after the update.');
@@ -245,9 +236,7 @@ export function Locations() {
   };
 
   const fieldError = (field: string) =>
-    Object.entries(formErrors).find(
-      ([key]) => key.toLowerCase() === field.toLowerCase(),
-    )?.[1];
+    Object.entries(formErrors).find(([key]) => key.toLowerCase() === field.toLowerCase())?.[1];
   const isFormValid =
     warehouses.some((warehouse) => warehouse.id === formValues.warehouseId) &&
     formValues.name.trim().length > 0 &&
@@ -260,303 +249,324 @@ export function Locations() {
   return (
     <Box component="main" sx={{ py: { xs: 3, md: 5 } }}>
       <Box sx={{ maxWidth: 1320, mx: 'auto', px: { xs: 2, sm: 3 } }}>
-              <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                spacing={2}
-                sx={{
-                  mb: 3,
-                  alignItems: { xs: 'stretch', sm: 'center' },
-                  justifyContent: 'space-between',
-                }}
-              >
-                <Box>
-                  <Typography variant="overline" color="primary" sx={{ fontWeight: 700 }}>
-                    WAREHOUSE OPERATIONS
-                  </Typography>
-                  <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
-                    Locations
-                  </Typography>
-                  <Typography color="text.secondary" sx={{ mt: 0.5 }}>
-                    Manage storage locations within your warehouses.
-                  </Typography>
-                </Box>
-                <Button
-                  variant="contained"
-                  startIcon={<AddIcon />}
-                  onClick={openCreateForm}
-                  disabled={!canManage || warehouses.length === 0}
-                  sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}
-                >
-                  Add location
-                </Button>
-              </Stack>
-
-              {warehouses.length === 0 && !isLoading && !loadFailed && (
-                <Alert severity="info" sx={{ mb: 2 }}>
-                  Create a warehouse before adding a location.
-                </Alert>
-              )}
-              {actionError && !deletingLocation && (
-                <Alert severity="error" sx={{ mb: 2 }}>{actionError}</Alert>
-              )}
-              <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
-                <Stack direction="row" sx={{ p: 2.5, justifyContent: 'space-between' }}>
-                  <Box>
-                    <Typography variant="h6" sx={{ fontWeight: 650 }}>
-                      All locations
-                    </Typography>
-                    <Typography variant="body2" color="text.secondary">
-                      {locations.length} {locations.length === 1 ? 'location' : 'locations'}
-                    </Typography>
-                  </Box>
-                </Stack>
-                {isLoading ? (
-                  <Stack spacing={2} sx={{ py: 8, alignItems: 'center' }} role="status">
-                    <CircularProgress size={30} />
-                    <Typography color="text.secondary">Loading locations…</Typography>
-                  </Stack>
-                ) : loadFailed ? (
-                  <Stack spacing={2} sx={{ alignItems: 'center', p: 4 }}>
-                    <Alert severity="error" sx={{ width: '100%' }}>
-                      {errorMessage(loadError)}
-                    </Alert>
-                    <Button
-                      variant="outlined"
-                      onClick={() => void retryLoad()}
-                    >
-                      Retry
-                    </Button>
-                  </Stack>
-                ) : locations.length === 0 ? (
-                  <Stack spacing={1.5} sx={{ alignItems: 'center', py: 8, px: 2 }}>
-                    <PlaceOutlinedIcon color="action" sx={{ fontSize: 42 }} />
-                    <Typography variant="h6" sx={{ fontWeight: 650 }}>
-                      No locations yet
-                    </Typography>
-                    <Typography color="text.secondary" sx={{ textAlign: 'center' }}>
-                      Add a location to a warehouse to organize inventory storage.
-                    </Typography>
-                    {warehouses.length > 0 && (
-                      <Button variant="contained" startIcon={<AddIcon />} onClick={openCreateForm} disabled={!canManage}>
-                        Add your first location
-                      </Button>
-                    )}
-                  </Stack>
-                ) : (
-                  <TableContainer>
-                    <Table>
-                      <TableHead>
-                        <TableRow>
-                          <TableCell>Location</TableCell>
-                          <TableCell>Code</TableCell>
-                          <TableCell>Warehouse</TableCell>
-                          <TableCell>Type</TableCell>
-                          <TableCell>Status</TableCell>
-                          <TableCell align="right">Actions</TableCell>
-                        </TableRow>
-                      </TableHead>
-                      <TableBody>
-                        {locations.map((location) => (
-                          <TableRow hover key={location.id}>
-                            <TableCell>
-                              <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                                {location.name}
-                              </Typography>
-                              <Typography variant="caption" color="text.secondary">
-                                {location.barcode || 'No barcode'}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>{location.code}</TableCell>
-                            <TableCell>
-                              {warehouseNames.get(location.warehouseId) ?? location.warehouseId}
-                            </TableCell>
-                            <TableCell>{location.type}</TableCell>
-                            <TableCell>{location.isActive ? 'Active' : 'Inactive'}</TableCell>
-                            <TableCell align="right">
-                              <BarcodeLabelButton
-                                title={location.name}
-                                subtitle={`Location: ${location.code}`}
-                                barcode={location.barcode}
-                              />
-                              <Tooltip title="Edit location">
-                                <IconButton
-                                  aria-label={`Edit ${location.name}`}
-                                  onClick={() => openEditForm(location)}
-                                  disabled={!canManage}
-                                >
-                                  <EditOutlinedIcon />
-                                </IconButton>
-                              </Tooltip>
-                              <Tooltip title="Delete location">
-                                <IconButton
-                                  aria-label={`Delete ${location.name}`}
-                                  color="error"
-                                  onClick={() => {
-                                    setActionError(undefined);
-                                    setDeletingLocation(location);
-                                  }}
-                                  disabled={!canManage}
-                                >
-                                  <DeleteOutlineIcon />
-                                </IconButton>
-                              </Tooltip>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </TableContainer>
-                )}
-              </Paper>
-      </Box>
-        <Dialog
-          open={Boolean(formMode)}
-          onClose={() => !isSaving && setFormMode(undefined)}
-          fullWidth
-          maxWidth="sm"
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={2}
+          sx={{
+            mb: 3,
+            alignItems: { xs: 'stretch', sm: 'center' },
+            justifyContent: 'space-between',
+          }}
         >
-          <Box component="form" onSubmit={submitForm}>
-            <DialogTitleWithClose
-              onClose={() => !isSaving && setFormMode(undefined)}
-              disabled={isSaving}
+          <Box>
+            <Typography variant="overline" color="primary" sx={{ fontWeight: 700 }}>
+              WAREHOUSE OPERATIONS
+            </Typography>
+            <Typography variant="h4" component="h1" sx={{ fontWeight: 700 }}>
+              Locations
+            </Typography>
+            <Typography color="text.secondary" sx={{ mt: 0.5 }}>
+              Manage storage locations within your warehouses.
+            </Typography>
+          </Box>
+          {canManage && (
+            <Button
+              variant="contained"
+              startIcon={<AddIcon />}
+              onClick={openCreateForm}
+              disabled={!canManage || warehouses.length === 0}
+              sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}
             >
-              {formMode?.type === 'create' ? 'Add location' : 'Edit location'}
-            </DialogTitleWithClose>
-            <DialogContent>
-              <Stack spacing={2} sx={{ pt: 1 }}>
-                {actionError && <Alert severity="error">{actionError}</Alert>}
-                <FormControl required error={Boolean(fieldError('WarehouseId'))}>
-                  <InputLabel id="location-warehouse-label">Warehouse</InputLabel>
-                  <Select
-                    labelId="location-warehouse-label"
-                    label="Warehouse"
-                    value={formValues.warehouseId}
-                    onChange={(event) =>
-                      setFormValues((current) => ({
-                        ...current,
-                        warehouseId: event.target.value,
-                      }))
-                    }
-                  >
-                    {warehouses.map((warehouse) => (
-                      <MenuItem key={warehouse.id} value={warehouse.id}>
-                        {warehouse.name} ({warehouse.code})
-                      </MenuItem>
-                    ))}
-                  </Select>
-                  <FormHelperText>{fieldError('WarehouseId')?.join(' ')}</FormHelperText>
-                </FormControl>
-                <TextField
-                  required
-                  label="Location name"
-                  value={formValues.name}
+              Add location
+            </Button>
+          )}
+        </Stack>
+
+        {warehouses.length === 0 && !isLoading && !loadFailed && (
+          <Alert severity="info" sx={{ mb: 2 }}>
+            Create a warehouse before adding a location.
+          </Alert>
+        )}
+        {actionError && !deletingLocation && (
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {actionError}
+          </Alert>
+        )}
+        <Paper variant="outlined" sx={{ overflow: 'hidden' }}>
+          <Stack direction="row" sx={{ p: 2.5, justifyContent: 'space-between' }}>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 650 }}>
+                All locations
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                {locations.length} {locations.length === 1 ? 'location' : 'locations'}
+              </Typography>
+            </Box>
+          </Stack>
+          {isLoading ? (
+            <Stack spacing={2} sx={{ py: 8, alignItems: 'center' }} role="status">
+              <CircularProgress size={30} />
+              <Typography color="text.secondary">Loading locations…</Typography>
+            </Stack>
+          ) : loadFailed ? (
+            <Stack spacing={2} sx={{ alignItems: 'center', p: 4 }}>
+              <Alert severity="error" sx={{ width: '100%' }}>
+                {errorMessage(loadError)}
+              </Alert>
+              <Button variant="outlined" onClick={() => void retryLoad()}>
+                Retry
+              </Button>
+            </Stack>
+          ) : locations.length === 0 ? (
+            <Stack spacing={1.5} sx={{ alignItems: 'center', py: 8, px: 2 }}>
+              <PlaceOutlinedIcon color="action" sx={{ fontSize: 42 }} />
+              <Typography variant="h6" sx={{ fontWeight: 650 }}>
+                No locations yet
+              </Typography>
+              <Typography color="text.secondary" sx={{ textAlign: 'center' }}>
+                Add a location to a warehouse to organize inventory storage.
+              </Typography>
+              {warehouses.length > 0 && canManage && (
+                <Button variant="contained" startIcon={<AddIcon />} onClick={openCreateForm}>
+                  Add your first location
+                </Button>
+              )}
+            </Stack>
+          ) : (
+            <TableContainer>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Location</TableCell>
+                    <TableCell>Code</TableCell>
+                    <TableCell>Warehouse</TableCell>
+                    <TableCell>Type</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {locations.map((location) => (
+                    <TableRow hover key={location.id}>
+                      <TableCell>
+                        <Typography variant="body2" sx={{ fontWeight: 600 }}>
+                          {location.name}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {location.barcode || 'No barcode'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>{location.code}</TableCell>
+                      <TableCell>
+                        {warehouseNames.get(location.warehouseId) ?? location.warehouseId}
+                      </TableCell>
+                      <TableCell>{location.type}</TableCell>
+                      <TableCell>{location.isActive ? 'Active' : 'Inactive'}</TableCell>
+                      <TableCell align="right">
+                        <BarcodeLabelButton
+                          title={location.name}
+                          subtitle={`Location: ${location.code}`}
+                          barcode={location.barcode}
+                        />
+                        {canManage && (
+                          <Tooltip title="Edit location">
+                            <IconButton
+                              aria-label={`Edit ${location.name}`}
+                              onClick={() => openEditForm(location)}
+                            >
+                              <EditOutlinedIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                        {canManage && (
+                          <Tooltip title="Delete location">
+                            <IconButton
+                              aria-label={`Delete ${location.name}`}
+                              color="error"
+                              onClick={() => {
+                                setActionError(undefined);
+                                setDeletingLocation(location);
+                              }}
+                            >
+                              <DeleteOutlineIcon />
+                            </IconButton>
+                          </Tooltip>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
+        </Paper>
+      </Box>
+      <Dialog
+        open={Boolean(formMode)}
+        onClose={() => !isSaving && setFormMode(undefined)}
+        fullWidth
+        maxWidth="sm"
+      >
+        <Box component="form" onSubmit={submitForm}>
+          <DialogTitleWithClose
+            onClose={() => !isSaving && setFormMode(undefined)}
+            disabled={isSaving}
+          >
+            {formMode?.type === 'create' ? 'Add location' : 'Edit location'}
+          </DialogTitleWithClose>
+          <DialogContent>
+            <Stack spacing={2} sx={{ pt: 1 }}>
+              {actionError && <Alert severity="error">{actionError}</Alert>}
+              <FormControl required error={Boolean(fieldError('WarehouseId'))}>
+                <InputLabel id="location-warehouse-label">Warehouse</InputLabel>
+                <Select
+                  labelId="location-warehouse-label"
+                  label="Warehouse"
+                  value={formValues.warehouseId}
                   onChange={(event) =>
-                    setFormValues((current) => ({ ...current, name: event.target.value }))
-                  }
-                  slotProps={{ htmlInput: { maxLength: 100 } }}
-                  error={Boolean(fieldError('Name'))}
-                  helperText={fieldError('Name')?.join(' ')}
-                />
-                <TextField
-                  required
-                  label="Code"
-                  value={formValues.code}
-                  onChange={(event) =>
-                    setFormValues((current) => ({ ...current, code: event.target.value }))
-                  }
-                  slotProps={{ htmlInput: { maxLength: 50 } }}
-                  error={Boolean(fieldError('Code'))}
-                  helperText={fieldError('Code')?.join(' ')}
-                />
-                <TextField
-                  required
-                  label="Type"
-                  value={formValues.type}
-                  onChange={(event) =>
-                    setFormValues((current) => ({ ...current, type: event.target.value }))
-                  }
-                  slotProps={{ htmlInput: { maxLength: 50 } }}
-                  error={Boolean(fieldError('Type'))}
-                  helperText={fieldError('Type')?.join(' ')}
-                />
-                <TextField
-                  label="Barcode (optional)"
-                  value={formValues.barcode}
-                  onChange={(event) =>
-                    setFormValues((current) => ({ ...current, barcode: event.target.value }))
-                  }
-                  slotProps={{ htmlInput: { maxLength: 100 } }}
-                  error={Boolean(fieldError('Barcode'))}
-                  helperText={
-                    fieldError('Barcode')?.join(' ') ??
-                    'Unique internal Code 128 value. Generated codes are not GS1 registered.'
-                  }
-                />
-                <Button
-                  size="small"
-                  sx={{ alignSelf: 'flex-start' }}
-                  onClick={() =>
                     setFormValues((current) => ({
                       ...current,
-                      barcode: generateInternalBarcode('location'),
+                      warehouseId: event.target.value,
                     }))
                   }
                 >
-                  Generate internal barcode
-                </Button>
-                <FormControlLabel
-                  control={
-                    <Checkbox
-                      checked={formValues.isActive}
-                      onChange={(event) =>
-                        setFormValues((current) => ({
-                          ...current,
-                          isActive: event.target.checked,
-                        }))
-                      }
-                    />
-                  }
-                  label="Active"
-                />
-              </Stack>
-            </DialogContent>
-            <DialogActions sx={{ p: 2 }}>
-              <Button onClick={() => setFormMode(undefined)} disabled={isSaving}>Cancel</Button>
+                  {warehouses.map((warehouse) => (
+                    <MenuItem key={warehouse.id} value={warehouse.id}>
+                      {warehouse.name} ({warehouse.code})
+                    </MenuItem>
+                  ))}
+                </Select>
+                <FormHelperText>{fieldError('WarehouseId')?.join(' ')}</FormHelperText>
+              </FormControl>
+              <TextField
+                required
+                label="Location name"
+                value={formValues.name}
+                onChange={(event) =>
+                  setFormValues((current) => ({ ...current, name: event.target.value }))
+                }
+                slotProps={{ htmlInput: { maxLength: 100 } }}
+                error={Boolean(fieldError('Name'))}
+                helperText={fieldError('Name')?.join(' ')}
+              />
+              <TextField
+                required
+                label="Code"
+                value={formValues.code}
+                onChange={(event) =>
+                  setFormValues((current) => ({ ...current, code: event.target.value }))
+                }
+                slotProps={{ htmlInput: { maxLength: 50 } }}
+                error={Boolean(fieldError('Code'))}
+                helperText={fieldError('Code')?.join(' ')}
+              />
+              <TextField
+                required
+                label="Type"
+                value={formValues.type}
+                onChange={(event) =>
+                  setFormValues((current) => ({ ...current, type: event.target.value }))
+                }
+                slotProps={{ htmlInput: { maxLength: 50 } }}
+                error={Boolean(fieldError('Type'))}
+                helperText={fieldError('Type')?.join(' ')}
+              />
+              <TextField
+                label="Barcode (optional)"
+                value={formValues.barcode}
+                onChange={(event) =>
+                  setFormValues((current) => ({ ...current, barcode: event.target.value }))
+                }
+                slotProps={{ htmlInput: { maxLength: 100 } }}
+                error={Boolean(fieldError('Barcode'))}
+                helperText={
+                  fieldError('Barcode')?.join(' ') ??
+                  'Unique internal Code 128 value. Generated codes are not GS1 registered.'
+                }
+              />
               <Button
-                type="submit"
-                variant="contained"
-                disabled={!canManage || isSaving || !isFormValid}
+                size="small"
+                sx={{ alignSelf: 'flex-start' }}
+                onClick={() =>
+                  setFormValues((current) => ({
+                    ...current,
+                    barcode: generateInternalBarcode('location'),
+                  }))
+                }
               >
-                {isSaving ? 'Saving…' : formMode?.type === 'create' ? 'Create location' : 'Save changes'}
+                Generate internal barcode
               </Button>
-            </DialogActions>
-          </Box>
-        </Dialog>
-        <Dialog
-          open={canManage && Boolean(deletingLocation)}
-          onClose={() => !isDeleting && setDeletingLocation(undefined)}
-          maxWidth="xs"
-          fullWidth
-        >
-          <DialogTitleWithClose
-            onClose={() => !isDeleting && setDeletingLocation(undefined)}
-            disabled={isDeleting}
-          >
-            Delete location?
-          </DialogTitleWithClose>
-          <DialogContent>
-            <Typography color="text.secondary">
-              Delete {deletingLocation?.name}? Locations referenced by inventory or transactions cannot be deleted.
-            </Typography>
-            {actionError && <Alert severity="error" sx={{ mt: 2 }}>{actionError}</Alert>}
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={formValues.isActive}
+                    onChange={(event) =>
+                      setFormValues((current) => ({
+                        ...current,
+                        isActive: event.target.checked,
+                      }))
+                    }
+                  />
+                }
+                label="Active"
+              />
+            </Stack>
           </DialogContent>
           <DialogActions sx={{ p: 2 }}>
-            <Button onClick={() => setDeletingLocation(undefined)} disabled={isDeleting}>Cancel</Button>
-            <Button color="error" variant="contained" onClick={() => void removeLocation()} disabled={!canManage || isDeleting}>
-              {isDeleting ? 'Deleting…' : 'Delete'}
+            <Button onClick={() => setFormMode(undefined)} disabled={isSaving}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              variant="contained"
+              disabled={!canManage || isSaving || !isFormValid}
+            >
+              {isSaving
+                ? 'Saving…'
+                : formMode?.type === 'create'
+                  ? 'Create location'
+                  : 'Save changes'}
             </Button>
           </DialogActions>
-        </Dialog>
+        </Box>
+      </Dialog>
+      <Dialog
+        open={canManage && Boolean(deletingLocation)}
+        onClose={() => !isDeleting && setDeletingLocation(undefined)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitleWithClose
+          onClose={() => !isDeleting && setDeletingLocation(undefined)}
+          disabled={isDeleting}
+        >
+          Delete location?
+        </DialogTitleWithClose>
+        <DialogContent>
+          <Typography color="text.secondary">
+            Delete {deletingLocation?.name}? Locations referenced by inventory or transactions
+            cannot be deleted.
+          </Typography>
+          {actionError && (
+            <Alert severity="error" sx={{ mt: 2 }}>
+              {actionError}
+            </Alert>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setDeletingLocation(undefined)} disabled={isDeleting}>
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={() => void removeLocation()}
+            disabled={!canManage || isDeleting}
+          >
+            {isDeleting ? 'Deleting…' : 'Delete'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Box>
   );
 }

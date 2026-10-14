@@ -8,6 +8,7 @@ import {
   CircularProgress,
   FormControl,
   Dialog,
+  DialogActions,
   DialogContent,
   Table,
   TableBody,
@@ -42,11 +43,7 @@ import {
   markOrderReady,
   updateOrder,
 } from '../lib/api';
-import type {
-  CustomerOrder,
-  OrderDispatchRequest,
-  OrderRequest,
-} from '../lib/api';
+import type { CustomerOrder, OrderDispatchRequest, OrderRequest } from '../lib/api';
 import { queryKeys } from '../lib/queryKeys';
 import { useWmsAccess } from '../hooks/useWmsAccess';
 
@@ -87,9 +84,7 @@ function formatDate(value: string): string {
 }
 
 function isGuid(value: string): boolean {
-  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(
-    value,
-  );
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 }
 
 function toOrderRequest(form: OrderFormValues): OrderRequest | null {
@@ -198,9 +193,9 @@ export function Orders() {
   } catch (error) {
     orderValidationError = errorMessage(error);
   }
-  const [dispatchSelections, setDispatchSelections] = useState<
-    Record<string, DispatchSelection>
-  >({});
+  const [dispatchSelections, setDispatchSelections] = useState<Record<string, DispatchSelection>>(
+    {},
+  );
   const dispatchIntent = useRef<DispatchIntent | undefined>(undefined);
   const submissionLock = useRef(false);
 
@@ -220,13 +215,8 @@ export function Orders() {
   };
 
   const saveMutation = useMutation({
-    mutationFn: async ({
-      id,
-      request,
-    }: {
-      id?: string;
-      request: OrderRequest;
-    }) => (id ? updateOrder(id, request) : createOrder(request)),
+    mutationFn: async ({ id, request }: { id?: string; request: OrderRequest }) =>
+      id ? updateOrder(id, request) : createOrder(request),
     onSuccess: async (order) => {
       if (order) {
         setSelectedOrderId(order.id);
@@ -360,7 +350,7 @@ export function Orders() {
     setDispatchSelections((current) => ({
       ...current,
       [lineId]: {
-        warehouseId: field === 'warehouseId' ? value : current[lineId]?.warehouseId ?? '',
+        warehouseId: field === 'warehouseId' ? value : (current[lineId]?.warehouseId ?? ''),
         locationId: field === 'locationId' ? value : '',
       },
     }));
@@ -402,16 +392,16 @@ export function Orders() {
     );
   const isDispatchFormValid = selectedOrder
     ? selectedOrder.lines.every((line) => {
-      const selection = dispatchSelections[line.id];
-      return Boolean(
-        selection?.locationId &&
+        const selection = dispatchSelections[line.id];
+        return Boolean(
+          selection?.locationId &&
           stockLocationsForLine(line.productId, line.quantity).some(
             (location) =>
               location.id === selection.locationId &&
               location.warehouseId === selection.warehouseId,
           ),
-      );
-    })
+        );
+      })
     : false;
 
   return (
@@ -433,12 +423,15 @@ export function Orders() {
               </Typography>
             </Box>
           </Stack>
-          <Button variant="contained" startIcon={<AddOutlinedIcon />} onClick={beginCreate} disabled={!canManageOrders}>
-            New order
-          </Button>
+          {canManageOrders && (
+            <Button variant="contained" startIcon={<AddOutlinedIcon />} onClick={beginCreate}>
+              New order
+            </Button>
+          )}
         </Stack>
         <Typography color="text.secondary" sx={{ mb: 3 }}>
-          Create customer orders, prepare them for fulfillment, and dispatch stock from selected locations.
+          Create customer orders, prepare them for fulfillment, and dispatch stock from selected
+          locations.
         </Typography>
 
         {error && (
@@ -464,7 +457,6 @@ export function Orders() {
             }
           >
             {errorMessage(error)}
-            {dispatchMutation.isError && ' Retrying the same dispatch reuses its idempotency key.'}
           </Alert>
         )}
         {formError && (
@@ -504,7 +496,7 @@ export function Orders() {
                       <TableRow>
                         <TableCell>Order</TableCell>
                         <TableCell>Customer</TableCell>
-                        <TableCell>Lines</TableCell>
+                        <TableCell>Items</TableCell>
                         <TableCell>Status</TableCell>
                         <TableCell>Created</TableCell>
                         <TableCell align="right">Actions</TableCell>
@@ -556,169 +548,176 @@ export function Orders() {
               >
                 {selectedOrder ? `Edit ${selectedOrder.orderNumber}` : 'Create order'}
               </DialogTitleWithClose>
-              <DialogContent>
-                    <Box component="form" onSubmit={submitOrder}>
-                      <Stack spacing={2.5}>
-                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                          {selectedOrder ? `Edit ${selectedOrder.orderNumber}` : 'Create order'}
-                        </Typography>
-                        {orderValidationError && (
-                          <Typography color="text.secondary" variant="body2" role="status">
-                            {orderValidationError}
-                          </Typography>
-                        )}
-                        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                          <TextField
-                            fullWidth
-                            label="Customer name (optional)"
-                            value={form.customerName}
+              <Box component="form" onSubmit={submitOrder}>
+                <DialogContent>
+                  <Stack spacing={2.5} sx={{ pt: 1 }}>
+                    <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+                      <TextField
+                        fullWidth
+                        label="Customer name (optional)"
+                        value={form.customerName}
+                        onChange={(event) =>
+                          setForm((current) => ({ ...current, customerName: event.target.value }))
+                        }
+                        slotProps={{ htmlInput: { maxLength: 200 } }}
+                      />
+                      <TextField
+                        fullWidth
+                        label="Reference GUID (optional)"
+                        value={form.referenceId}
+                        onChange={(event) =>
+                          setForm((current) => ({ ...current, referenceId: event.target.value }))
+                        }
+                      />
+                    </Stack>
+                    <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                      Product lines
+                    </Typography>
+                    {form.lines.map((line, index) => (
+                      <Stack
+                        key={`${index}-${line.productId}`}
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={1.5}
+                        sx={{ alignItems: { sm: 'flex-start' } }}
+                      >
+                        <FormControl fullWidth required>
+                          <InputLabel id={`order-product-${index}-label`}>Product</InputLabel>
+                          <Select
+                            labelId={`order-product-${index}-label`}
+                            label="Product"
+                            value={line.productId}
                             onChange={(event) =>
-                              setForm((current) => ({ ...current, customerName: event.target.value }))
-                            }
-                            slotProps={{ htmlInput: { maxLength: 200 } }}
-                          />
-                          <TextField
-                            fullWidth
-                            label="Reference GUID (optional)"
-                            value={form.referenceId}
-                            onChange={(event) =>
-                              setForm((current) => ({ ...current, referenceId: event.target.value }))
-                            }
-                          />
-                        </Stack>
-                        <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                          Product lines
-                        </Typography>
-                        {form.lines.map((line, index) => (
-                          <Stack
-                            key={`${index}-${line.productId}`}
-                            direction={{ xs: 'column', sm: 'row' }}
-                            spacing={1.5}
-                            sx={{ alignItems: { sm: 'center' } }}
-                          >
-                            <FormControl fullWidth required>
-                              <InputLabel id={`order-product-${index}-label`}>Product</InputLabel>
-                              <Select
-                                labelId={`order-product-${index}-label`}
-                                label="Product"
-                                value={line.productId}
-                                onChange={(event) =>
-                                  setForm((current) => ({
-                                    ...current,
-                                    lines: current.lines.map((item, itemIndex) =>
-                                      itemIndex === index
-                                        ? { ...item, productId: event.target.value }
-                                        : item,
-                                    ),
-                                  }))
-                                }
-                              >
-                                {products.map((product) => (
-                                  <MenuItem key={product.id} value={product.id}>
-                                    {product.name} ({product.sku})
-                                  </MenuItem>
-                                ))}
-                              </Select>
-                            </FormControl>
-                            <BarcodeScannerButton
-                              target="product"
-                              label="Scan"
-                              onResolved={(entity) => {
-                                if ('sku' in entity) {
-                                  setForm((current) => ({
-                                    ...current,
-                                    lines: current.lines.map((item, itemIndex) =>
-                                      itemIndex === index
-                                        ? { ...item, productId: entity.id }
-                                        : item,
-                                    ),
-                                  }));
-                                }
-                              }}
-                            />
-                            <TextField
-                              required
-                              label="Quantity"
-                              type="number"
-                              value={line.quantity}
-                              onChange={(event) =>
-                                setForm((current) => ({
-                                  ...current,
-                                  lines: current.lines.map((item, itemIndex) =>
-                                    itemIndex === index
-                                      ? { ...item, quantity: event.target.value }
-                                      : item,
-                                  ),
-                                }))
-                              }
-                              slotProps={{ htmlInput: { min: 0.001, step: 0.001 } }}
-                              error={
-                                !line.quantity ||
-                                !Number.isFinite(Number(line.quantity)) ||
-                                Number(line.quantity) <= 0 ||
-                                Number(line.quantity) >= 1_000_000_000_000_000 ||
-                                Math.round(Number(line.quantity) * 1000) / 1000 !==
-                                  Number(line.quantity)
-                              }
-                              helperText={
-                                !line.quantity ||
-                                !Number.isFinite(Number(line.quantity)) ||
-                                Number(line.quantity) <= 0 ||
-                                Number(line.quantity) >= 1_000_000_000_000_000 ||
-                                Math.round(Number(line.quantity) * 1000) / 1000 !==
-                                  Number(line.quantity)
-                                  ? 'Enter a positive quantity with up to three decimals.'
-                                  : ' '
-                              }
-                              sx={{ minWidth: { sm: 150 } }}
-                            />
-                            <IconButton
-                              aria-label={`Remove product line ${index + 1}`}
-                              disabled={form.lines.length === 1}
-                              onClick={() =>
-                                setForm((current) => ({
-                                  ...current,
-                                  lines: current.lines.filter((_, itemIndex) => itemIndex !== index),
-                                }))
-                              }
-                            >
-                              <DeleteOutlineIcon />
-                            </IconButton>
-                          </Stack>
-                        ))}
-                        <Stack direction="row" spacing={1}>
-                          <Button
-                            startIcon={<AddOutlinedIcon />}
-                            onClick={() =>
                               setForm((current) => ({
                                 ...current,
-                                lines: [...current.lines, { productId: '', quantity: '' }],
+                                lines: current.lines.map((item, itemIndex) =>
+                                  itemIndex === index
+                                    ? { ...item, productId: event.target.value }
+                                    : item,
+                                ),
                               }))
                             }
                           >
-                            Add line
-                          </Button>
-                        </Stack>
-                        <Stack direction="row" spacing={1.5}>
-                          <Button
-                            type="submit"
-                            variant="contained"
-                            disabled={saveMutation.isPending || Boolean(orderValidationError)}
-                          >
-                            {saveMutation.isPending ? 'Saving…' : 'Save draft'}
-                          </Button>
-                          <Button
-                            onClick={() => {
-                              setEditing(false);
-                              setFormError(undefined);
-                            }}
-                          >
-                            Close
-                          </Button>
-                        </Stack>
+                            {products.map((product) => (
+                              <MenuItem key={product.id} value={product.id}>
+                                {product.name} ({product.sku})
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                        <BarcodeScannerButton
+                          target="product"
+                          label="Scan"
+                          variant="outlined"
+                          fullHeight
+                          onResolved={(entity) => {
+                            if ('sku' in entity) {
+                              setForm((current) => ({
+                                ...current,
+                                lines: current.lines.map((item, itemIndex) =>
+                                  itemIndex === index ? { ...item, productId: entity.id } : item,
+                                ),
+                              }));
+                            }
+                          }}
+                        />
+                        <TextField
+                          required
+                          label="Quantity"
+                          type="number"
+                          value={line.quantity}
+                          onChange={(event) =>
+                            setForm((current) => ({
+                              ...current,
+                              lines: current.lines.map((item, itemIndex) =>
+                                itemIndex === index
+                                  ? { ...item, quantity: event.target.value }
+                                  : item,
+                              ),
+                            }))
+                          }
+                          slotProps={{ htmlInput: { min: 0.001, step: 0.001 } }}
+                          error={
+                            !line.quantity ||
+                            !Number.isFinite(Number(line.quantity)) ||
+                            Number(line.quantity) <= 0 ||
+                            Number(line.quantity) >= 1_000_000_000_000_000 ||
+                            Math.round(Number(line.quantity) * 1000) / 1000 !==
+                              Number(line.quantity)
+                          }
+                          helperText={
+                            !line.quantity ||
+                            !Number.isFinite(Number(line.quantity)) ||
+                            Number(line.quantity) <= 0 ||
+                            Number(line.quantity) >= 1_000_000_000_000_000 ||
+                            Math.round(Number(line.quantity) * 1000) / 1000 !==
+                              Number(line.quantity)
+                              ? 'Enter a positive quantity with up to three decimals.'
+                              : undefined
+                          }
+                          sx={{ minWidth: { sm: 150 } }}
+                        />
+                        <IconButton
+                          sx={{ height: 56, width: 56 }}
+                          aria-label={`Remove product line ${index + 1}`}
+                          disabled={form.lines.length === 1}
+                          onClick={() =>
+                            setForm((current) => ({
+                              ...current,
+                              lines: current.lines.filter((_, itemIndex) => itemIndex !== index),
+                            }))
+                          }
+                        >
+                          <DeleteOutlineIcon />
+                        </IconButton>
                       </Stack>
-                    </Box>
-              </DialogContent>
+                    ))}
+                    <Stack direction="row" spacing={1}>
+                      <Button
+                        startIcon={<AddOutlinedIcon />}
+                        onClick={() =>
+                          setForm((current) => ({
+                            ...current,
+                            lines: [...current.lines, { productId: '', quantity: '' }],
+                          }))
+                        }
+                      >
+                        Add line
+                      </Button>
+                    </Stack>
+                  </Stack>
+                </DialogContent>
+                <DialogActions
+                  sx={{
+                    px: 3,
+                    pb: 2.5,
+                    pt: 1,
+                    justifyContent: 'space-between',
+                    gap: 2,
+                    flexWrap: 'wrap',
+                  }}
+                >
+                  <Typography color="text.secondary" variant="body2" role="status">
+                    {orderValidationError ?? ' '}
+                  </Typography>
+                  <Stack direction="row" spacing={1.5}>
+                    <Button
+                      onClick={() => {
+                        setEditing(false);
+                        setFormError(undefined);
+                      }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      variant="contained"
+                      disabled={saveMutation.isPending || Boolean(orderValidationError)}
+                    >
+                      {saveMutation.isPending ? 'Saving…' : 'Save draft'}
+                    </Button>
+                  </Stack>
+                </DialogActions>
+              </Box>
             </Dialog>
             <Dialog
               open={detailOpen && Boolean(selectedOrder) && !editing}
@@ -731,162 +730,181 @@ export function Orders() {
               </DialogTitleWithClose>
               <DialogContent>
                 {selectedOrder && (
-                    <Stack spacing={2.5}>
-                      <Stack
-                        direction={{ xs: 'column', sm: 'row' }}
-                        spacing={1.5}
-                        sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}
-                      >
-                        <Box>
-                          <Typography variant="h6" sx={{ fontWeight: 700 }}>
-                            {selectedOrder.orderNumber}
-                          </Typography>
-                          <Typography variant="body2" color="text.secondary">
-                            {selectedOrder.customerName || 'No customer'} · Created {formatDate(selectedOrder.createdAt)}
-                          </Typography>
-                        </Box>
-                        <Chip label={selectedOrder.status} color="primary" variant="outlined" />
-                      </Stack>
-                      {selectedOrder.referenceId && (
-                        <Typography variant="body2" color="text.secondary">
-                          Reference: {selectedOrder.referenceId}
+                  <Stack spacing={2.5}>
+                    <Stack
+                      direction={{ xs: 'column', sm: 'row' }}
+                      spacing={1.5}
+                      sx={{ justifyContent: 'space-between', alignItems: { sm: 'center' } }}
+                    >
+                      <Box>
+                        <Typography variant="h6" sx={{ fontWeight: 700 }}>
+                          {selectedOrder.orderNumber}
                         </Typography>
-                      )}
-                      <Stack spacing={1}>
-                        {selectedOrder.lines.map((line) => (
-                          <Paper key={line.id} variant="outlined" sx={{ p: 1.5 }}>
-                            <Stack
-                              direction={{ xs: 'column', sm: 'row' }}
-                              spacing={1}
-                              sx={{ justifyContent: 'space-between' }}
-                            >
-                              <Typography sx={{ fontWeight: 650 }}>
-                                {line.productName} ({line.sku})
-                              </Typography>
-                              <Typography color="text.secondary">
-                                Requested: {line.quantity}
-                              </Typography>
-                            </Stack>
-                            {line.dispatchLocationName && (
-                              <Typography variant="body2" color="text.secondary">
-                                Dispatched from {line.dispatchWarehouseName} / {line.dispatchLocationName}
-                              </Typography>
-                            )}
-                          </Paper>
-                        ))}
-                      </Stack>
-                      {canDispatch && selectedOrder.status === 'Ready' && (
-                        <Stack spacing={1.5}>
-                          <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
-                            Dispatch source locations
-                          </Typography>
-                          {selectedOrder.lines.map((line) => {
-                            const stockedLocations = stockLocationsForLine(line.productId, line.quantity);
-                            const allowedWarehouses = warehouses.filter((warehouse) =>
-                              stockedLocations.some((location) => location.warehouseId === warehouse.id),
-                            );
-                            const selection = dispatchSelections[line.id] ?? {
-                              warehouseId: '',
-                              locationId: '',
-                            };
-                            const availableLocations = stockedLocations.filter(
-                              (location) => location.warehouseId === selection.warehouseId,
-                            );
-
-                            return (
-                              <Stack
-                                key={line.id}
-                                spacing={1}
-                                direction={{ xs: 'column', sm: 'row' }}
-                                sx={{ alignItems: { sm: 'center' } }}
-                              >
-                                <Typography sx={{ minWidth: { sm: 180 }, flex: 1 }}>
-                                  {line.productName} · {line.quantity}
-                                </Typography>
-                                <FormControl fullWidth size="small">
-                                  <InputLabel id={`dispatch-warehouse-${line.id}`}>Warehouse</InputLabel>
-                                  <Select
-                                    labelId={`dispatch-warehouse-${line.id}`}
-                                    label="Warehouse"
-                                    value={selection.warehouseId}
-                                    onChange={(event) =>
-                                      updateDispatchSelection(line.id, 'warehouseId', event.target.value)
-                                    }
-                                  >
-                                    {allowedWarehouses.map((warehouse) => (
-                                      <MenuItem key={warehouse.id} value={warehouse.id}>
-                                        {warehouse.name} ({warehouse.code})
-                                      </MenuItem>
-                                    ))}
-                                  </Select>
-                                </FormControl>
-                                <FormControl fullWidth size="small" disabled={!selection.warehouseId}>
-                                  <InputLabel id={`dispatch-location-${line.id}`}>Location</InputLabel>
-                                  <Select
-                                    labelId={`dispatch-location-${line.id}`}
-                                    label="Location"
-                                    value={selection.locationId}
-                                    onChange={(event) =>
-                                      updateDispatchSelection(line.id, 'locationId', event.target.value)
-                                    }
-                                  >
-                                    {availableLocations.map((location) => (
-                                      <MenuItem key={location.id} value={location.id}>
-                                        {location.name} ({location.code})
-                                      </MenuItem>
-                                    ))}
-                                  </Select>
-                                </FormControl>
-                                <BarcodeScannerButton
-                                  target="location"
-                                  label="Scan"
-                                  onResolved={(entity) => {
-                                    if ('warehouseId' in entity) {
-                                      setDispatchSelections((current) => ({
-                                        ...current,
-                                        [line.id]: {
-                                          warehouseId: entity.warehouseId,
-                                          locationId: entity.id,
-                                        },
-                                      }));
-                                    }
-                                  }}
-                                />
-                              </Stack>
-                            );
-                          })}
-                          <Button
-                            variant="contained"
-                            onClick={submitDispatch}
-                            disabled={!isDispatchFormValid || dispatchMutation.isPending}
-                            sx={{ alignSelf: 'flex-start' }}
+                        <Typography variant="body2" color="text.secondary">
+                          {selectedOrder.customerName || 'No customer'} · Created{' '}
+                          {formatDate(selectedOrder.createdAt)}
+                        </Typography>
+                      </Box>
+                      <Chip label={selectedOrder.status} color="primary" variant="outlined" />
+                    </Stack>
+                    {selectedOrder.referenceId && (
+                      <Typography variant="body2" color="text.secondary">
+                        Reference: {selectedOrder.referenceId}
+                      </Typography>
+                    )}
+                    <Stack spacing={1}>
+                      {selectedOrder.lines.map((line) => (
+                        <Paper key={line.id} variant="outlined" sx={{ p: 1.5 }}>
+                          <Stack
+                            direction={{ xs: 'column', sm: 'row' }}
+                            spacing={1}
+                            sx={{ justifyContent: 'space-between' }}
                           >
-                            {dispatchMutation.isPending ? 'Dispatching…' : 'Dispatch order'}
-                          </Button>
-                          {!isDispatchFormValid && (
-                            <Typography color="text.secondary" variant="body2" role="status">
-                              Choose a source location with sufficient inventory for every line.
+                            <Typography sx={{ fontWeight: 650 }}>
+                              {line.productName} ({line.sku})
+                            </Typography>
+                            <Typography color="text.secondary">
+                              Requested: {line.quantity}
+                            </Typography>
+                          </Stack>
+                          {line.dispatchLocationName && (
+                            <Typography variant="body2" color="text.secondary">
+                              Dispatched from {line.dispatchWarehouseName} /{' '}
+                              {line.dispatchLocationName}
                             </Typography>
                           )}
-                        </Stack>
-                      )}
-                      <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap' }}>
-                        {canManageOrders && selectedOrder.status === 'Draft' && (
-                          <>
-                            <Button variant="outlined" onClick={() => beginEdit(selectedOrder)}>
-                              Edit draft
-                            </Button>
-                            <Button
-                              variant="contained"
-                              onClick={() => readyMutation.mutate(selectedOrder.id)}
-                              disabled={readyMutation.isPending}
+                        </Paper>
+                      ))}
+                    </Stack>
+                    {canDispatch && selectedOrder.status === 'Ready' && (
+                      <Stack spacing={1.5}>
+                        <Typography variant="subtitle1" sx={{ fontWeight: 700 }}>
+                          Dispatch source locations
+                        </Typography>
+                        {selectedOrder.lines.map((line) => {
+                          const stockedLocations = stockLocationsForLine(
+                            line.productId,
+                            line.quantity,
+                          );
+                          const allowedWarehouses = warehouses.filter((warehouse) =>
+                            stockedLocations.some(
+                              (location) => location.warehouseId === warehouse.id,
+                            ),
+                          );
+                          const selection = dispatchSelections[line.id] ?? {
+                            warehouseId: '',
+                            locationId: '',
+                          };
+                          const availableLocations = stockedLocations.filter(
+                            (location) => location.warehouseId === selection.warehouseId,
+                          );
+
+                          return (
+                            <Stack
+                              key={line.id}
+                              spacing={1}
+                              direction={{ xs: 'column', sm: 'row' }}
+                              sx={{ alignItems: { sm: 'center' } }}
                             >
-                              Mark Ready
-                            </Button>
-                          </>
+                              <Typography sx={{ minWidth: { sm: 180 }, flex: 1 }}>
+                                {line.productName} · {line.quantity}
+                              </Typography>
+                              <FormControl fullWidth size="small">
+                                <InputLabel id={`dispatch-warehouse-${line.id}`}>
+                                  Warehouse
+                                </InputLabel>
+                                <Select
+                                  labelId={`dispatch-warehouse-${line.id}`}
+                                  label="Warehouse"
+                                  value={selection.warehouseId}
+                                  onChange={(event) =>
+                                    updateDispatchSelection(
+                                      line.id,
+                                      'warehouseId',
+                                      event.target.value,
+                                    )
+                                  }
+                                >
+                                  {allowedWarehouses.map((warehouse) => (
+                                    <MenuItem key={warehouse.id} value={warehouse.id}>
+                                      {warehouse.name} ({warehouse.code})
+                                    </MenuItem>
+                                  ))}
+                                </Select>
+                              </FormControl>
+                              <FormControl fullWidth size="small" disabled={!selection.warehouseId}>
+                                <InputLabel id={`dispatch-location-${line.id}`}>
+                                  Location
+                                </InputLabel>
+                                <Select
+                                  labelId={`dispatch-location-${line.id}`}
+                                  label="Location"
+                                  value={selection.locationId}
+                                  onChange={(event) =>
+                                    updateDispatchSelection(
+                                      line.id,
+                                      'locationId',
+                                      event.target.value,
+                                    )
+                                  }
+                                >
+                                  {availableLocations.map((location) => (
+                                    <MenuItem key={location.id} value={location.id}>
+                                      {location.name} ({location.code})
+                                    </MenuItem>
+                                  ))}
+                                </Select>
+                              </FormControl>
+                              <BarcodeScannerButton
+                                target="location"
+                                label="Scan"
+                                onResolved={(entity) => {
+                                  if ('warehouseId' in entity) {
+                                    setDispatchSelections((current) => ({
+                                      ...current,
+                                      [line.id]: {
+                                        warehouseId: entity.warehouseId,
+                                        locationId: entity.id,
+                                      },
+                                    }));
+                                  }
+                                }}
+                              />
+                            </Stack>
+                          );
+                        })}
+                        <Button
+                          variant="contained"
+                          onClick={submitDispatch}
+                          disabled={!isDispatchFormValid || dispatchMutation.isPending}
+                          sx={{ alignSelf: 'flex-start' }}
+                        >
+                          {dispatchMutation.isPending ? 'Dispatching…' : 'Dispatch order'}
+                        </Button>
+                        {!isDispatchFormValid && (
+                          <Typography color="text.secondary" variant="body2" role="status">
+                            Choose a source location with sufficient inventory for every line.
+                          </Typography>
                         )}
-                        {canManageOrders &&
-                          (selectedOrder.status === 'Draft' || selectedOrder.status === 'Ready') && (
+                      </Stack>
+                    )}
+                    <Stack direction="row" spacing={1.5} sx={{ flexWrap: 'wrap' }}>
+                      {canManageOrders && selectedOrder.status === 'Draft' && (
+                        <>
+                          <Button variant="outlined" onClick={() => beginEdit(selectedOrder)}>
+                            Edit draft
+                          </Button>
+                          <Button
+                            variant="contained"
+                            onClick={() => readyMutation.mutate(selectedOrder.id)}
+                            disabled={readyMutation.isPending}
+                          >
+                            Mark Ready
+                          </Button>
+                        </>
+                      )}
+                      {canManageOrders &&
+                        (selectedOrder.status === 'Draft' || selectedOrder.status === 'Ready') && (
                           <Button
                             color="error"
                             onClick={() => cancelMutation.mutate(selectedOrder.id)}
@@ -895,13 +913,17 @@ export function Orders() {
                             Cancel order
                           </Button>
                         )}
-                        {selectedOrder.status === 'Dispatched' && selectedOrder.dispatchedAt && (
-                          <Typography variant="body2" color="text.secondary" sx={{ alignSelf: 'center' }}>
-                            Dispatched {formatDate(selectedOrder.dispatchedAt)}
-                          </Typography>
-                        )}
-                      </Stack>
+                      {selectedOrder.status === 'Dispatched' && selectedOrder.dispatchedAt && (
+                        <Typography
+                          variant="body2"
+                          color="text.secondary"
+                          sx={{ alignSelf: 'center' }}
+                        >
+                          Dispatched {formatDate(selectedOrder.dispatchedAt)}
+                        </Typography>
+                      )}
                     </Stack>
+                  </Stack>
                 )}
               </DialogContent>
             </Dialog>

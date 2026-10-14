@@ -55,7 +55,7 @@ function requestError(error: unknown): string {
   return error instanceof Error ? error.message : 'Could not load audit history.';
 }
 
-export function AuditHistory() {
+export function AuditHistory({ embedded = false }: { embedded?: boolean }) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [user, setUser] = useState('');
@@ -94,10 +94,10 @@ export function AuditHistory() {
   };
 
   return (
-    <Box component="main" sx={{ py: { xs: 3, md: 5 } }}>
-      <Box sx={{ maxWidth: 1320, mx: 'auto', px: { xs: 2, sm: 3 } }}>
+    <Box component={embedded ? 'div' : 'main'} sx={embedded ? undefined : { py: { xs: 3, md: 5 } }}>
+      <Box sx={embedded ? undefined : { maxWidth: 1320, mx: 'auto', px: { xs: 2, sm: 3 } }}>
       <Stack spacing={2.5}>
-        <Box>
+        <Box sx={embedded ? { display: 'none' } : undefined}>
           <Typography variant="h4" sx={{ fontWeight: 700 }}>
             Audit History
           </Typography>

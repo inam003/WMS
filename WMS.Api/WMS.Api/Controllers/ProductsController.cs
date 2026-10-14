@@ -120,7 +120,7 @@ public sealed class ProductsController(IProductService productService) : Control
                 Conflict(new ProblemDetails
                 {
                     Status = StatusCodes.Status409Conflict,
-                    Title = "The product cannot be deleted while inventory records or transactions reference it."
+                    Title = "This product can't be deleted because it's used in stock records or customer orders"
                 }),
             _ => throw new InvalidOperationException($"Unhandled product error: {error}.")
         };

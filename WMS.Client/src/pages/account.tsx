@@ -9,13 +9,20 @@ import {
   Typography,
 } from '@mui/material';
 import { useParams } from 'react-router-dom';
+import { AuditHistory } from './audit-history';
+import { useWmsAccess } from '../hooks/useWmsAccess';
 
-type AccountTab = 'account' | 'security';
+type AccountTab = 'account' | 'security' | 'audit';
 
 export function Account() {
   const { pathname } = useParams();
+  const isAdmin = useWmsAccess().role === 'Admin';
   const [activeTab, setActiveTab] = useState<AccountTab>(() =>
-    pathname === 'security' ? 'security' : 'account',
+    pathname === 'security'
+      ? 'security'
+      : pathname === 'audit-history' && isAdmin
+        ? 'audit'
+        : 'account',
   );
 
   return (
@@ -33,7 +40,7 @@ export function Account() {
             Account settings
           </Typography>
           <Typography color="text.secondary">
-            Manage your profile, and security.
+            Manage your profile and security{isAdmin ? ', and review audit history' : ''}.
           </Typography>
         </Stack>
 
@@ -54,9 +61,13 @@ export function Account() {
           >
             <Tab value="account" label="Account" />
             <Tab value="security" label="Security" />
+            {isAdmin && <Tab value="audit" label="Audit history" />}
           </Tabs>
 
           <Box sx={{ p: { xs: 2, sm: 3 } }}>
+            {activeTab === 'audit' && isAdmin ? (
+              <AuditHistory embedded />
+            ) : (
             <Box
                 sx={(theme) => ({
                   '--background': theme.palette.background.default,
@@ -138,6 +149,7 @@ export function Account() {
                   }}
                 />
             </Box>
+            )}
           </Box>
         </Paper>
       </Box>

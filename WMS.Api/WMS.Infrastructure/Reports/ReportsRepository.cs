@@ -114,86 +114,87 @@ public sealed class ReportsRepository(ApplicationDbContext dbContext) : IReports
             .AsNoTracking()
             .Where(transaction => transaction.Type == "TransferIn");
 
-        IQueryable<TransferReportRow> transfers =
+        var pairs =
             from source in outgoing
             join destination in incoming
                 on source.TransferId equals destination.TransferId
-            select new TransferReportRow(
-                source.TransferId!.Value,
-                source.ProductId,
-                source.Product.Name,
-                source.Product.SKU,
-                source.Quantity,
-                source.Location.WarehouseId,
-                source.Location.Warehouse.Name,
-                source.LocationId,
-                source.Location.Name,
-                source.Location.Code,
-                destination.Location.WarehouseId,
-                destination.Location.Warehouse.Name,
-                destination.LocationId,
-                destination.Location.Name,
-                destination.Location.Code,
-                source.ReferenceId,
-                source.CreatedBy,
-                source.CreatedAt);
+            select new { source, destination };
 
         if (query.ProductId.HasValue)
         {
-            transfers = transfers.Where(row => row.ProductId == query.ProductId.Value);
+            pairs = pairs.Where(row => row.source.ProductId == query.ProductId.Value);
         }
 
         if (query.WarehouseId.HasValue && query.LocationId.HasValue)
         {
-            transfers = transfers.Where(row =>
-                (row.SourceWarehouseId == query.WarehouseId.Value &&
-                 row.SourceLocationId == query.LocationId.Value) ||
-                (row.DestinationWarehouseId == query.WarehouseId.Value &&
-                 row.DestinationLocationId == query.LocationId.Value));
+            pairs = pairs.Where(row =>
+                (row.source.Location.WarehouseId == query.WarehouseId.Value &&
+                 row.source.LocationId == query.LocationId.Value) ||
+                (row.destination.Location.WarehouseId == query.WarehouseId.Value &&
+                 row.destination.LocationId == query.LocationId.Value));
         }
         else if (query.WarehouseId.HasValue)
         {
-            transfers = transfers.Where(row =>
-                row.SourceWarehouseId == query.WarehouseId.Value ||
-                row.DestinationWarehouseId == query.WarehouseId.Value);
+            pairs = pairs.Where(row =>
+                row.source.Location.WarehouseId == query.WarehouseId.Value ||
+                row.destination.Location.WarehouseId == query.WarehouseId.Value);
         }
         else if (query.LocationId.HasValue)
         {
-            transfers = transfers.Where(row =>
-                row.SourceLocationId == query.LocationId.Value ||
-                row.DestinationLocationId == query.LocationId.Value);
+            pairs = pairs.Where(row =>
+                row.source.LocationId == query.LocationId.Value ||
+                row.destination.LocationId == query.LocationId.Value);
         }
 
         if (query.StartDate.HasValue)
         {
-            transfers = transfers.Where(row => row.CreatedAt >= query.StartDate.Value);
+            pairs = pairs.Where(row => row.source.CreatedAt >= query.StartDate.Value);
         }
 
         if (query.EndDate.HasValue)
         {
-            transfers = transfers.Where(row => row.CreatedAt <= query.EndDate.Value);
+            pairs = pairs.Where(row => row.source.CreatedAt <= query.EndDate.Value);
         }
 
         if (!string.IsNullOrWhiteSpace(query.Keyword))
         {
             var keyword = query.Keyword.Trim();
-            transfers = transfers.Where(row =>
-                row.ProductName.Contains(keyword) ||
-                row.SKU.Contains(keyword) ||
-                row.SourceLocationName.Contains(keyword) ||
-                row.SourceLocationCode.Contains(keyword) ||
-                row.SourceWarehouseName.Contains(keyword) ||
-                row.DestinationLocationName.Contains(keyword) ||
-                row.DestinationLocationCode.Contains(keyword) ||
-                row.DestinationWarehouseName.Contains(keyword) ||
-                row.CreatedBy.Contains(keyword) ||
-                (row.ReferenceId != null && row.ReferenceId.ToString()!.Contains(keyword)));
+            pairs = pairs.Where(row =>
+                row.source.Product.Name.Contains(keyword) ||
+                row.source.Product.SKU.Contains(keyword) ||
+                row.source.Location.Name.Contains(keyword) ||
+                row.source.Location.Code.Contains(keyword) ||
+                row.source.Location.Warehouse.Name.Contains(keyword) ||
+                row.destination.Location.Name.Contains(keyword) ||
+                row.destination.Location.Code.Contains(keyword) ||
+                row.destination.Location.Warehouse.Name.Contains(keyword) ||
+                row.source.CreatedBy.Contains(keyword) ||
+                (row.source.ReferenceId != null &&
+                 row.source.ReferenceId.ToString()!.Contains(keyword)));
         }
 
-        transfers = transfers
-            .OrderByDescending(row => row.CreatedAt)
-            .ThenByDescending(row => row.TransferId);
-
+        var transfers = pairs
+            .OrderByDescending(row => row.source.CreatedAt)
+            .ThenByDescending(row => row.source.TransferId)
+            .Select(row => new TransferReportRow(
+                row.source.TransferId!.Value,
+                row.source.ProductId,
+                row.source.Product.Name,
+                row.source.Product.SKU,
+                row.source.Quantity,
+                row.source.Location.WarehouseId,
+                row.source.Location.Warehouse.Name,
+                row.source.LocationId,
+                row.source.Location.Name,
+                row.source.Location.Code,
+                row.destination.Location.WarehouseId,
+                row.destination.Location.Warehouse.Name,
+                row.destination.LocationId,
+                row.destination.Location.Name,
+                row.destination.Location.Code,
+                row.source.ReferenceId,
+                row.source.CreatedBy,
+                row.source.CreatedAt));
         return await PaginateAsync(transfers, query, cancellationToken);
     }
 

@@ -56,6 +56,9 @@ public sealed class ProductRepository(ApplicationDbContext dbContext) : IProduct
             cancellationToken) ||
         await dbContext.InventoryTransactions.AnyAsync(
             transaction => transaction.ProductId == productId,
+            cancellationToken) ||
+        await dbContext.OrderLines.AnyAsync(
+            line => line.ProductId == productId,
             cancellationToken);
 
     public async Task<ProductPersistenceError> AddAsync(

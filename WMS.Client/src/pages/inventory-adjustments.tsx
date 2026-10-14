@@ -18,12 +18,8 @@ import {
 import { ToastAlert as Alert } from '../components/ToastProvider';
 import TuneOutlinedIcon from '@mui/icons-material/TuneOutlined';
 import { BarcodeScannerButton } from '../components/BarcodeScannerButton';
-import {
-  adjustInventory,
-  getLocations,
-  getProducts,
-  getWarehouses,
-} from '../lib/api';
+import { FormFooter, FormSection } from '../components/FormSection';
+import { adjustInventory, getLocations, getProducts, getWarehouses } from '../lib/api';
 import type {
   InventoryAdjustmentReason,
   InventoryAdjustmentRequest,
@@ -115,15 +111,9 @@ export function InventoryAdjustments() {
     locationsQuery.isError ? locationsQuery.error : undefined,
   ].find((error) => error !== undefined);
   const isLoading =
-    productsQuery.isPending ||
-    warehousesQuery.isPending ||
-    locationsQuery.isPending;
+    productsQuery.isPending || warehousesQuery.isPending || locationsQuery.isPending;
   const retryOptions = () =>
-    Promise.all([
-      productsQuery.refetch(),
-      warehousesQuery.refetch(),
-      locationsQuery.refetch(),
-    ]);
+    Promise.all([productsQuery.refetch(), warehousesQuery.refetch(), locationsQuery.refetch()]);
   const quantity = Number(form.quantity);
   const isQuantityValid =
     form.quantity.trim().length > 0 &&
@@ -173,12 +163,7 @@ export function InventoryAdjustments() {
         }),
       ]);
       intentRef.current = undefined;
-      setForm((current) => ({
-        ...current,
-        quantity: '',
-        reason: '',
-        explanation: '',
-      }));
+      setForm(emptyForm);
       setSuccessMessage(
         `${transaction.type === 'AdjustmentIncrease' ? 'Increased' : 'Decreased'} ${transaction.productName} by ${transaction.quantity}.`,
       );
@@ -265,8 +250,8 @@ export function InventoryAdjustments() {
           </Box>
         </Stack>
         <Typography color="text.secondary" sx={{ mb: 3 }}>
-          Correct inventory counts for damage, loss, or physical count discrepancies.
-          Decreases cannot take stock below zero.
+          Correct inventory counts for damage, loss, or physical count discrepancies. Decreases
+          cannot take stock below zero.
         </Typography>
 
         {optionsError && (
@@ -274,11 +259,7 @@ export function InventoryAdjustments() {
             severity="warning"
             sx={{ mb: 2 }}
             action={
-              <Button
-                color="inherit"
-                size="small"
-                onClick={() => void retryOptions()}
-              >
+              <Button color="inherit" size="small" onClick={() => void retryOptions()}>
                 Retry
               </Button>
             }
@@ -293,8 +274,7 @@ export function InventoryAdjustments() {
         )}
         {adjustmentMutation.isError && (
           <Alert severity="error" sx={{ mb: 2 }}>
-            Adjustment failed: {errorMessage(adjustmentMutation.error)}. Retrying
-            the same adjustment reuses its idempotency key.
+            {errorMessage(adjustmentMutation.error)}
           </Alert>
         )}
         {successMessage && (
@@ -303,180 +283,199 @@ export function InventoryAdjustments() {
           </Alert>
         )}
 
-        <Paper component="form" variant="outlined" onSubmit={submitAdjustment}>
+        <Paper
+          component="form"
+          variant="outlined"
+          onSubmit={submitAdjustment}
+          sx={{ overflow: 'hidden' }}
+        >
           {isLoading ? (
             <Stack spacing={2} sx={{ p: 5, alignItems: 'center' }} role="status">
               <CircularProgress size={30} />
-              <Typography color="text.secondary">
-                Loading adjustment options…
-              </Typography>
+              <Typography color="text.secondary">Loading adjustment options…</Typography>
             </Stack>
           ) : (
-            <Stack spacing={2.5} sx={{ p: { xs: 2, sm: 3 } }}>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5} sx={{ alignItems: { sm: 'center' } }}>
-                <FormControl fullWidth required>
-                  <InputLabel id="adjustment-product-label">Product</InputLabel>
-                  <Select
-                    labelId="adjustment-product-label"
-                    label="Product"
-                    value={form.productId}
-                    onChange={(event) => updateForm('productId', event.target.value)}
-                  >
-                    {products.map((product) => (
-                      <MenuItem key={product.id} value={product.id}>
-                        {product.name} ({product.sku})
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <BarcodeScannerButton
-                  target="product"
-                  onResolved={(entity) => {
-                    if ('sku' in entity) updateForm('productId', entity.id);
-                  }}
-                />
-              </Stack>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                <FormControl fullWidth required>
-                  <InputLabel id="adjustment-warehouse-label">Warehouse</InputLabel>
-                  <Select
-                    labelId="adjustment-warehouse-label"
-                    label="Warehouse"
-                    value={form.warehouseId}
-                    onChange={(event) => {
-                      setForm((current) => ({
-                        ...current,
-                        warehouseId: event.target.value,
-                        locationId: '',
-                      }));
-                      setFormError(undefined);
-                      setSuccessMessage(undefined);
-                    }}
-                  >
-                    {warehouses.map((warehouse) => (
-                      <MenuItem key={warehouse.id} value={warehouse.id}>
-                        {warehouse.name} ({warehouse.code})
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <FormControl fullWidth required disabled={!form.warehouseId}>
-                  <InputLabel id="adjustment-location-label">Location</InputLabel>
-                  <Select
-                    labelId="adjustment-location-label"
-                    label="Location"
-                    value={form.locationId}
-                    onChange={(event) => updateForm('locationId', event.target.value)}
-                  >
-                    {locations.map((location) => (
-                      <MenuItem key={location.id} value={location.id}>
-                        {location.name} ({location.code})
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-                <BarcodeScannerButton
-                  target="location"
-                  label="Scan location"
-                  onResolved={(entity) => {
-                    if ('warehouseId' in entity) {
-                      setForm((current) => ({
-                        ...current,
-                        warehouseId: entity.warehouseId,
-                        locationId: entity.id,
-                      }));
-                      setFormError(undefined);
-                      setSuccessMessage(undefined);
-                    }
-                  }}
-                />
-              </Stack>
-              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
-                <FormControl fullWidth required>
-                  <InputLabel id="adjustment-type-label">Adjustment type</InputLabel>
-                  <Select
-                    labelId="adjustment-type-label"
-                    label="Adjustment type"
-                    value={form.type}
-                    onChange={(event) =>
-                      updateForm(
-                        'type',
-                        event.target.value as InventoryAdjustmentType | '',
-                      )
-                    }
-                  >
-                    <MenuItem value="Increase">Increase</MenuItem>
-                    <MenuItem value="Decrease">Decrease</MenuItem>
-                  </Select>
-                </FormControl>
-                <TextField
-                  fullWidth
-                  required
-                  type="number"
-                  label="Quantity"
-                  value={form.quantity}
-                  onChange={(event) => updateForm('quantity', event.target.value)}
-                  slotProps={{ htmlInput: { min: 0, step: '0.001' } }}
-                />
-              </Stack>
-              <FormControl fullWidth required>
-                <InputLabel id="adjustment-reason-label">Reason</InputLabel>
-                <Select
-                  labelId="adjustment-reason-label"
-                  label="Reason"
-                  value={form.reason}
-                  onChange={(event) =>
-                    updateForm(
-                      'reason',
-                      event.target.value as InventoryAdjustmentReason | '',
-                    )
-                  }
+            <>
+              <FormSection
+                step={1}
+                title="Product"
+                description="Choose the product to adjust, or scan its barcode."
+              >
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={1.5}
+                  sx={{ alignItems: { sm: 'flex-start' } }}
                 >
-                  {Object.entries(reasonLabels).map(([value, label]) => (
-                    <MenuItem key={value} value={value}>
-                      {label}
-                    </MenuItem>
-                  ))}
-                </Select>
+                  <FormControl fullWidth required>
+                    <InputLabel id="adjustment-product-label">Product</InputLabel>
+                    <Select
+                      labelId="adjustment-product-label"
+                      label="Product"
+                      value={form.productId}
+                      onChange={(event) => updateForm('productId', event.target.value)}
+                    >
+                      {products.map((product) => (
+                        <MenuItem key={product.id} value={product.id}>
+                          {product.name} ({product.sku})
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <BarcodeScannerButton
+                    target="product"
+                    variant="outlined"
+                    fullHeight
+                    label="Scan product"
+                    onResolved={(entity) => {
+                      if ('sku' in entity) updateForm('productId', entity.id);
+                    }}
+                  />
+                </Stack>
+              </FormSection>
+              <FormSection
+                step={2}
+                title="Location"
+                description="Pick the warehouse and location where the count is being corrected."
+              >
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={2}
+                  sx={{ alignItems: { sm: 'flex-start' } }}
+                >
+                  <FormControl fullWidth required>
+                    <InputLabel id="adjustment-warehouse-label">Warehouse</InputLabel>
+                    <Select
+                      labelId="adjustment-warehouse-label"
+                      label="Warehouse"
+                      value={form.warehouseId}
+                      onChange={(event) => {
+                        setForm((current) => ({
+                          ...current,
+                          warehouseId: event.target.value,
+                          locationId: '',
+                        }));
+                        setFormError(undefined);
+                        setSuccessMessage(undefined);
+                      }}
+                    >
+                      {warehouses.map((warehouse) => (
+                        <MenuItem key={warehouse.id} value={warehouse.id}>
+                          {warehouse.name} ({warehouse.code})
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <FormControl fullWidth required disabled={!form.warehouseId}>
+                    <InputLabel id="adjustment-location-label">Location</InputLabel>
+                    <Select
+                      labelId="adjustment-location-label"
+                      label="Location"
+                      value={form.locationId}
+                      onChange={(event) => updateForm('locationId', event.target.value)}
+                    >
+                      {locations.map((location) => (
+                        <MenuItem key={location.id} value={location.id}>
+                          {location.name} ({location.code})
+                        </MenuItem>
+                      ))}
+                    </Select>
+                  </FormControl>
+                  <BarcodeScannerButton
+                    target="location"
+                    variant="outlined"
+                    fullHeight
+                    label="Scan location"
+                    onResolved={(entity) => {
+                      if ('warehouseId' in entity) {
+                        setForm((current) => ({
+                          ...current,
+                          warehouseId: entity.warehouseId,
+                          locationId: entity.id,
+                        }));
+                        setFormError(undefined);
+                        setSuccessMessage(undefined);
+                      }
+                    }}
+                  />
+                </Stack>
+              </FormSection>
+              <FormSection
+                step={3}
+                title="Adjustment"
+                description="Say whether stock goes up or down, by how much, and why."
+              >
+                <Stack
+                  direction={{ xs: 'column', sm: 'row' }}
+                  spacing={2}
+                  sx={{ alignItems: { sm: 'flex-start' } }}
+                >
+                  <FormControl fullWidth required>
+                    <InputLabel id="adjustment-type-label">Adjustment type</InputLabel>
+                    <Select
+                      labelId="adjustment-type-label"
+                      label="Adjustment type"
+                      value={form.type}
+                      onChange={(event) =>
+                        updateForm('type', event.target.value as InventoryAdjustmentType | '')
+                      }
+                    >
+                      <MenuItem value="Increase">Increase</MenuItem>
+                      <MenuItem value="Decrease">Decrease</MenuItem>
+                    </Select>
+                  </FormControl>
+                  <TextField
+                    fullWidth
+                    required
+                    type="number"
+                    label="Quantity"
+                    value={form.quantity}
+                    onChange={(event) => updateForm('quantity', event.target.value)}
+                    slotProps={{ htmlInput: { min: 0, step: '0.001' } }}
+                  />
+                </Stack>
+                <FormControl fullWidth required>
+                  <InputLabel id="adjustment-reason-label">Reason</InputLabel>
+                  <Select
+                    labelId="adjustment-reason-label"
+                    label="Reason"
+                    value={form.reason}
+                    onChange={(event) =>
+                      updateForm('reason', event.target.value as InventoryAdjustmentReason | '')
+                    }
+                  >
+                    {Object.entries(reasonLabels).map(([value, label]) => (
+                      <MenuItem key={value} value={value}>
+                        {label}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                  {form.reason === 'Other' && (
+                    <FormHelperText>An explanation is required for Other.</FormHelperText>
+                  )}
+                </FormControl>
                 {form.reason === 'Other' && (
-                  <FormHelperText>
-                    An explanation is required for Other.
-                  </FormHelperText>
+                  <TextField
+                    fullWidth
+                    required
+                    multiline
+                    minRows={2}
+                    label="Explanation"
+                    value={form.explanation}
+                    onChange={(event) => updateForm('explanation', event.target.value)}
+                    slotProps={{ htmlInput: { maxLength: 500 } }}
+                  />
                 )}
-              </FormControl>
-              {form.reason === 'Other' && (
-                <TextField
-                  fullWidth
-                  required
-                  multiline
-                  minRows={2}
-                  label="Explanation"
-                  value={form.explanation}
-                  onChange={(event) =>
-                    updateForm('explanation', event.target.value)
-                  }
-                  slotProps={{ htmlInput: { maxLength: 500 } }}
-                />
-              )}
-              {adjustmentValidationMessage && (
-                <Typography color="text.secondary" variant="body2" role="status">
-                  {adjustmentValidationMessage}
-                </Typography>
-              )}
-              <Stack direction="row" sx={{ justifyContent: 'flex-end' }}>
+              </FormSection>
+              <FormFooter message={adjustmentValidationMessage}>
                 <Button
                   type="submit"
                   variant="contained"
-                  disabled={
-                    !isAdjustmentFormValid || adjustmentMutation.isPending
-                  }
+                  disabled={!isAdjustmentFormValid || adjustmentMutation.isPending}
                 >
-                  {adjustmentMutation.isPending
-                    ? 'Saving adjustment…'
-                    : 'Save adjustment'}
+                  {adjustmentMutation.isPending ? 'Saving adjustment…' : 'Save adjustment'}
                 </Button>
-              </Stack>
-            </Stack>
+              </FormFooter>
+            </>
           )}
         </Paper>
       </Box>
