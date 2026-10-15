@@ -783,7 +783,7 @@ function WmsAccessGate() {
           ? 'Your warehouse access has been turned off. Contact your warehouse administrator if you think this is a mistake.'
           : status === 401
             ? 'Your sign-in has expired. Sign in again to continue.'
-            : status === 403 || !userQuery.data?.isActive
+            : status === 403 || (userQuery.data && !userQuery.data.isActive)
               ? 'Your warehouse access is unavailable. Contact your warehouse administrator.'
               : userQuery.error instanceof Error
                 ? userQuery.error.message
