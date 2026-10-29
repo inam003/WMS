@@ -1,0 +1,131 @@
+.landing-benefits {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  min-height: 66.6667vw;
+  padding: 5.86vw 5.664% 3.52vw;
+  background: #f8fbff;
+  color: #080f24;
+  font-family: Arial, sans-serif;
+}
+
+.landing-benefits-copy { position: relative; z-index: 1; width: 64.8%; }
+
+.landing-benefits-eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 1.43vw;
+  margin: 0;
+  color: #081026;
+  text-transform: uppercase;
+  letter-spacing: 3px;
+  font-size: clamp(12px, 0.91146vw, 18px);
+  font-weight: 700;
+  line-height: 1.4;
+}
+
+.landing-benefits-eyebrow::before { content: ''; width: 2.67vw; height: 3px; background: #0971ff; }
+
+.landing-benefits h2 {
+  margin: 1.69vw 0 0.91vw;
+  font-size: clamp(36px, 4.03646vw, 80px);
+  font-weight: 700;
+  line-height: 1;
+  letter-spacing: -0.12vw;
+  white-space: nowrap;
+}
+
+.landing-benefits h2 span { display: block; color: #5b6882; }
+
+.landing-benefits-description {
+  max-width: 47.3vw;
+  margin: 0;
+  color: #667695;
+  font-size: clamp(17px, 1.4323vw, 28px);
+  line-height: 1.42;
+}
+
+.landing-benefits-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1.04vw 1.17vw; margin-top: 1.63vw; }
+
+.landing-benefit {
+  min-width: 0;
+  padding: 1.17vw 1.56vw 1.04vw;
+  border: 1px solid #dfebfc;
+  border-radius: 15px;
+  background: #fafdffbf;
+}
+
+.landing-benefit-icon {
+  display: grid;
+  place-items: center;
+  width: 4.6875vw;
+  height: 4.6875vw;
+  margin-left: -0.2vw;
+  border: 1px solid #dceaff;
+  border-radius: 50%;
+  background: #e9f3ff;
+  color: #006aff;
+}
+
+.landing-benefit-icon svg { width: 2.6vw; height: 2.6vw; }
+
+.landing-benefit h3 { margin: 0.91vw 0 0.52vw; color: #0a1024; font-size: clamp(16px, 1.3021vw, 26px); font-weight: 600; line-height: 1.27; letter-spacing: -0.035vw; }
+.landing-benefit h3 span, .landing-benefit p span { display: block; }
+.landing-benefit p { margin: 0; color: #657695; font-size: clamp(14px, 1.107vw, 22px); line-height: 1.42; }
+
+.landing-benefits-actions { display: flex; align-items: center; gap: 2.73vw; margin-top: 1.89vw; }
+
+.landing-benefits-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1.3vw;
+  min-height: 3.97vw;
+  padding: 0 2.47vw;
+  border-radius: 12px;
+  background: linear-gradient(115deg, #0637ad, #0a3da9);
+  color: white;
+  font-size: clamp(15px, 1.107vw, 22px);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.landing-benefits-primary:hover { background: #062e8d; }
+.landing-benefits-primary svg { width: 24px; height: 24px; stroke: currentColor; stroke-width: 1.5; }
+
+
+
+.landing-benefits-actions :focus-visible { outline: 3px solid #2563eb; outline-offset: 5px; }
+
+.landing-benefits-artwork { position: absolute; inset: 0; margin: 0; pointer-events: none; clip-path: inset(0 0 0 63.2%); }
+.landing-benefits-artwork img { display: block; width: 100%; height: auto; }
+
+@media (min-width: 900px) and (max-width: 1199px) {
+  .landing-benefit h3 { font-size: 1.3021vw; }
+  .landing-benefit p { font-size: 1.107vw; }
+}
+
+@media (max-width: 899px) {
+  .landing-benefits { display: flex; flex-direction: column; min-height: 0; padding: 64px 6% 40px; }
+  .landing-benefits-copy { width: 100%; }
+  .landing-benefits-eyebrow { gap: 20px; font-size: 12px; }
+  .landing-benefits-eyebrow::before { width: 36px; }
+  .landing-benefits h2 { margin: 28px 0 24px; font-size: clamp(36px, 5.6vw, 48px); line-height: 1.1; letter-spacing: -1.2px; white-space: normal; }
+  .landing-benefits-description { max-width: none; font-size: 18px; line-height: 1.5; }
+  .landing-benefits-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 32px; }
+  .landing-benefit { padding: 22px; border-radius: 15px; }
+  .landing-benefit-icon { width: 64px; height: 64px; margin-left: 0; }
+  .landing-benefit-icon svg { width: 36px; height: 36px; }
+  .landing-benefit h3 { margin: 16px 0 10px; font-size: 19px; letter-spacing: -0.3px; }
+  .landing-benefit h3 span, .landing-benefit p span { display: inline; }
+  .landing-benefit p { font-size: 16px; line-height: 1.5; }
+  .landing-benefits-actions { flex-wrap: wrap; gap: 20px; margin-top: 30px; }
+  .landing-benefits-primary { min-height: 54px; padding: 0 24px; gap: 20px; font-size: 16px; }
+
+  .landing-benefits-artwork { position: relative; order: 1; height: 151vw; margin: 36px -6.82% 0; overflow: hidden; clip-path: none; }
+  .landing-benefits-artwork img { position: absolute; width: 270%; max-width: none; top: -8vw; right: 0; clip-path: inset(0 0 0 63.2%); }
+}
+
+@media (max-width: 599px) {
+  .landing-benefits-grid { grid-template-columns: 1fr; }
+}

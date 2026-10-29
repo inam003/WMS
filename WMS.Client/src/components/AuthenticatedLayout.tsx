@@ -70,7 +70,7 @@ const navigationGroups: { label: string; icon: ReactElement; items: NavItem[] }[
     label: 'Overview',
     icon: <DashboardOutlinedIcon />,
     items: [
-      { label: 'Dashboard', to: '/', icon: <HomeOutlinedIcon /> },
+      { label: 'Dashboard', to: '/dashboard', icon: <HomeOutlinedIcon /> },
       { label: 'Reports', to: '/reports', icon: <AssessmentOutlinedIcon /> },
     ],
   },

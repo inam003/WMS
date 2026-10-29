@@ -1,0 +1,54 @@
+.landing-page {
+  --landing-primary: #2563eb;
+  --landing-primary-hover: #1d4ed8;
+  --landing-ink: #081832;
+  --landing-muted: #60708c;
+  --landing-surface: #f5faff;
+  --landing-border: #dfeafb;
+  font-family: Arial, sans-serif;
+}
+
+/* Shared controls apply only to the public landing page. */
+.landing-page :is(.landing-dark-button, .landing-features-explore,
+  .landing-workflow-primary, .landing-benefits-primary, .closing-get-started) {
+  min-height: 54px;
+  padding-inline: 28px;
+  border: 1px solid var(--landing-primary);
+  border-radius: 10px;
+  background: var(--landing-primary);
+  color: #fff;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+  box-shadow: none;
+}
+
+.landing-page :is(.landing-dark-button, .landing-features-explore,
+  .landing-workflow-primary, .landing-benefits-primary, .closing-get-started):hover {
+  background: var(--landing-primary-hover);
+  border-color: var(--landing-primary-hover);
+}
+
+.landing-page .landing-login { min-height: 44px; padding-inline: 24px; }
+
+
+
+
+
+.landing-page :is(a, button, summary):focus-visible {
+  outline: 3px solid var(--landing-primary);
+  outline-offset: 5px;
+}
+
+/* Limit document scrolling styles to the public landing page. */
+html:has(.landing-page) { scroll-behavior: smooth; }
+.landing-page .landing-logo { display: block; width: 150px; height: 52px; object-fit: contain; }
+@media (min-width: 600px) and (max-width: 899px) {
+  .landing-header .landing-logo { width: 90px; }
+}
+@media (max-width: 599px) {
+  .landing-header .landing-logo { width: 130px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  html:has(.landing-page) { scroll-behavior: auto; }
+}

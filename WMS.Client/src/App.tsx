@@ -20,6 +20,7 @@ import { WarehouseTransfers } from './pages/warehouse-transfers';
 import { Users } from './pages/users';
 import { AcceptInvitation } from './pages/accept-invitation';
 import { Welcome } from './pages/welcome';
+import { LandingEntry } from './pages/landing';
 import { useWmsAccess } from './hooks/useWmsAccess';
 import type { WmsRole } from './lib/api';
 
@@ -37,7 +38,7 @@ function RequireRoles({
       <Alert
         severity="error"
         action={
-          <Button component={RouterLink} to="/" color="inherit" size="small">
+          <Button component={RouterLink} to="/dashboard" color="inherit" size="small">
             Dashboard
           </Button>
         }
@@ -58,8 +59,9 @@ const adminRoles: WmsRole[] = ['Admin'];
 export default function App() {
   return (
     <Routes>
+      <Route path="/" element={<LandingEntry />} />
       <Route element={<AuthenticatedLayout />}>
-        <Route path="/" element={<Home />} />
+        <Route path="/dashboard" element={<Home />} />
         <Route path="/account" element={<Account />} />
         <Route path="/account/:pathname" element={<Account />} />
         <Route path="/products" element={<Products />} />
