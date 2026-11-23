@@ -29,6 +29,22 @@ using WMS.Infrastructure.Warehouses;
 
 var builder = WebApplication.CreateBuilder(args);
 
+var configuredPort = builder.Configuration["PORT"];
+if (!string.IsNullOrWhiteSpace(configuredPort))
+{
+    if (!int.TryParse(configuredPort, out var port) || port is < 1 or > 65535)
+    {
+        throw new InvalidOperationException(
+            "PORT must be an integer between 1 and 65535.");
+    }
+
+    builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+}
+else if (!builder.Environment.IsDevelopment())
+{
+    builder.WebHost.UseUrls("http://0.0.0.0:8080");
+}
+
 builder.Services.AddControllers();
 builder.Services.AddOpenApi();
 

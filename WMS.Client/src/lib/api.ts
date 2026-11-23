@@ -474,11 +474,18 @@ function parseProblemDetails(value: unknown): ProblemDetails {
 }
 
 function getApiBaseUrl(): string {
-  const apiBaseUrl = import.meta.env.VITE_API_BASE_URL;
-  if (!apiBaseUrl) {
-    throw new ApiError('VITE_API_BASE_URL is not configured.');
+  const configuredBaseUrl = import.meta.env.VITE_API_BASE_URL?.trim();
+  if (configuredBaseUrl) {
+    return configuredBaseUrl.replace(/\/+$/, '').replace(/\/api$/, '');
   }
-  return apiBaseUrl.replace(/\/+$/, '');
+
+  if (import.meta.env.PROD) {
+    return '';
+  }
+
+  throw new ApiError(
+    'VITE_API_BASE_URL is not configured for local development.',
+  );
 }
 
 async function readApiResponse<T>(response: Response): Promise<T | null> {

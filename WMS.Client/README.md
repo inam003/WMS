@@ -4,7 +4,16 @@
 
 The signed-in home page includes a **Verify API access** action. It obtains a short-lived JWT with the Neon Auth SDK's `neon.auth.token()` method and sends it as a bearer token to `GET /api/auth/me`. The API verifies the EdDSA signature against Neon Auth's JWKS and checks the issuer, audience, and expiration.
 
-Configure `VITE_API_BASE_URL` in the client environment (for the supplied HTTPS API launch profile, use `https://localhost:7215`). Configure `NEON_AUTH_BASE_URL` for the API with the Neon Auth base URL. In production, also configure `Cors:AllowedOrigins` (or `Cors__AllowedOrigins`) with the exact frontend origin. Development allows `http://localhost:5173` by default.
+Configure `VITE_API_BASE_URL` for local development (for the supplied HTTPS
+API launch profile, use `https://localhost:7215`). Production builds default to
+same-origin requests, so each request path includes `/api` exactly once. A
+separately deployed frontend can override the production base with
+`VITE_API_BASE_URL=https://<api-project>.vercel.app`.
+
+Configure `NEON_AUTH_BASE_URL` for the API with the Neon Auth base URL. In
+production, also configure `Cors:AllowedOrigins` (or
+`Cors__AllowedOrigins__0`) with the exact frontend origin. Development allows
+`http://localhost:5173` by default.
 
 To run the API locally, use the API project directory (not the solution root):
 
